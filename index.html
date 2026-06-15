@@ -29,14 +29,15 @@
   .muted { color: #64748b; font-size: 14px; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   label.fld { display: block; font-size: 13px; font-weight: 500; color: #334155; margin: 12px 0 4px; }
-  select, input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px;
-    font-size: 14px; background: #fff; }
+  select, input[type=text], input[type=number] { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1;
+    border-radius: 8px; font-size: 14px; background: #fff; }
   select:focus, input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px #e0e7ff; }
   .btn { background: #4f46e5; color: #fff; border: none; border-radius: 8px; padding: 9px 16px;
     font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
   .btn:hover { background: #4338ca; }
   .btn.dark { background: #0f172a; } .btn.dark:hover { background: #1e293b; }
   .btn.ghost { background: #f1f5f9; color: #334155; } .btn.ghost:hover { background: #e2e8f0; }
+  .btn.sm { padding: 5px 10px; font-size: 13px; }
   .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
   .filebox { border: 1.5px dashed #cbd5e1; border-radius: 10px; padding: 22px; text-align: center; cursor: pointer; }
   .filebox.ok { border-style: solid; border-color: #34d399; background: #ecfdf5; }
@@ -60,6 +61,7 @@
   .stat .val { font-size: 30px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
   .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .note { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 10px; padding: 14px; font-size: 14px; }
+  .ok-note { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 10px; padding: 12px 14px; font-size: 13px; }
   .empty { text-align: center; color: #94a3b8; padding: 40px; font-size: 14px; }
   @media (max-width: 720px){ .grid2,.grid3{ grid-template-columns: 1fr; } }
 </style>
@@ -71,13 +73,14 @@ const { useState, useEffect, useRef, useMemo } = React;
 
 const FACT = "#4f46e5", NOFA = "#fb7185";
 const PEOPLE_DEF = ["zbaeza","lurtubia","vanessahernandez","vretamales","jcisternas"];
+const MONTHS = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPT","OCT","NOV","DIC"];
 const CONF_DEF = ["A & C EQUIPO GASTRONOMICO","ABENGOA CHILE S.A.","AERONAUTICAL SUPPLIES SPA","AGRICOLA POBENA S.A.","AGRONUTRICION SPA","AGROGUASH SPA","AMSEC SPA","ANILINAS MONTBLAC","ASCEND LABORATORIES SPA","AUSTIN CHILE TRADING","BASCA","BRISTOL MYERS SQUIBB DE CHILE","BARNICES ANDINOS SPA","BOTANICAL SOLUTIONS SPA","COM. CARISUR LTDA","CALIDRA","CENTRAL DE REST ARAMARK","CIA.ELECTROMETALURGICA","COMERCIAL HIDROCENTRO S.A.","COMERCIAL DICALLA S.A.","COMERCIAL PROCOMEC LIMITADA","COMERCIAL RTI SPA","COMERCIAL RNK LIMITADA","COMERCIAL. LOS ROBLES","COM Y SERV SUN RENTAL CHILE","COMERCIALIZADORA CHEGO CHEGO SPA","CRUCERO S.A.","CURTIEMBRE BASKA S A","D-LAYOUT","DIMERC","DJ","DOÑA ANTONIA SOLAR","EGLO CHILE ILUMINACION LTDA","EMARESA, INGENIEROS Y REPR.","EBRO STAFSJO VALVES CHILE","EUROFARMA CHILE SPA","FABRICA DE CALZADOS GINO S.A.","FLEISCHMANN CHILE S.A.","FESANCO SPA","FRANKLIN ELEC.(CHILE) LIMITADA","GENERAL PRODUCTS CHILE S.A.","GINO","GOTT SPA","GREAT PLAINS STAINLESS S.A.","GREAT SOLUCION","GRID SOLUTIONS CHILE SA","GRUPO LATYN SA","GYM LOGISTIC","IMPORTADORA RAGU SPA","IMPORTADORA DINAR S.R. LTDA.","INV. FOTOVOLTAICAS SPA","IMP.Y COM.ALIANZA COMER. SPA","IMPALSA SPA","IMPORTADORA Y COMERCIALIZDORA TRIPANTU SPA","INGENIERIA CARO Y CARO LTDA.","ITA SPA","JACUZZI CHILE S.A","JORGUE DE CAMINO","LUVAL S.A.","MAT.Y COMP.INDUST.METACOM","MATTEL","METKA","MIXTAIL S.A.","MECHANICAL AND PIPING SOLUTIONS SPA","MIYSTAIL","TAMARICO SOLAR DOS SPA","P Y P","PLANTA SOLAR TOCOPILLA SPA","PAL LOGISTICS","PE Y PE S.A.","PENA SPOERER Y CIA S.A.","PERI CHILE ENCOFRADOS Y AND","PERNOSTOCK LTDA","POWER TRANSMISSION S SPA","PESCO RENTAL","PRINAL","RAUL TAGLE E HIJOS LTDA","ROMINA FERNANDA LOPEZ","SEMILLAS TUNICHE","SERV.DE REHA.IND.CIPP CHILE SA","SILEN","SIMMA","SMURFIT KAPPA DE CHILE S.A.","SOC. COM. LORCA Y ESTIBILL LIMITADA","SUN RENTAL","VERTIV CONO SUR LIMITADA","WONTECH","XYLEM WATER SOLUTIONS CHILE"];
 
-const norm = s => String(s||"").trim().toUpperCase().replace(/\s+/g," ");
+const norm = s => String(s==null?"":s).trim().toUpperCase().replace(/\s+/g," ");
+const despKey = v => String(v==null?"":v).trim().replace(/\.0+$/,"");
 const today = () => { const d=new Date(); const p=n=>String(n).padStart(2,"0");
   return p(d.getDate())+"-"+p(d.getMonth()+1)+"-"+d.getFullYear(); };
 
-// ¿Estamos dentro de los primeros 5 días hábiles del mes?
 function isFirst5BizDays(){
   const now=new Date(); let biz=0;
   for(let day=1; day<=now.getDate(); day++){
@@ -87,35 +90,53 @@ function isFirst5BizDays(){
   return biz<=5;
 }
 
-// Adivina qué columna corresponde según palabras clave
-function guess(headers, keys){
-  for(const h of headers){ const n=h.toLowerCase();
-    if(keys.some(k=>n.includes(k))) return h; }
-  return "";
-}
-
-async function readExcel(file){
+// Lee TODAS las hojas como matrices (filas x columnas)
+async function readWB(file){
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, {type:"array"});
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
-  const headers = (aoa[0]||[]).map(h=>String(h).trim()).filter(h=>h!=="");
-  const rows = aoa.slice(1)
-    .filter(r=>r.some(c=>String(c).trim()!==""))
-    .map(r=>{ const o={}; headers.forEach((h,i)=>o[h]=r[i]); return o; });
+  return wb.SheetNames.map(name=>({
+    name,
+    aoa: XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, defval:"", raw:true})
+  }));
+}
+
+// Encuentra la fila que parece ser de encabezados
+function detectHeaderRow(aoa){
+  const top = Math.min(aoa.length, 20);
+  for(let r=0;r<top;r++){
+    const cells=(aoa[r]||[]).map(c=>String(c).toLowerCase());
+    if(cells.some(c=>c.includes("despach"))) return r;
+  }
+  let best=0,bestC=-1;
+  for(let r=0;r<Math.min(aoa.length,12);r++){
+    const c=(aoa[r]||[]).filter(x=>String(x).trim()!=="").length;
+    if(c>bestC){bestC=c;best=r;}
+  }
+  return best;
+}
+
+// A partir de una hoja + fila de encabezado, arma {headers, rows}
+function buildTable(aoa, hr){
+  const rawH = aoa[hr]||[];
+  const headers = rawH.map((h,i)=>{ const t=String(h).replace(/\s+/g," ").trim(); return t || ("Columna "+(i+1)); });
+  const rows = aoa.slice(hr+1).filter(r=>r.some(c=>String(c).trim()!==""));
   return { headers, rows };
 }
 
-function FileBox({label, hint, data, onLoad}){
-  const ref = useRef();
+function guessIdx(headers, keys){
+  for(let i=0;i<headers.length;i++){ const n=headers[i].toLowerCase();
+    if(keys.some(k=>n.includes(k))) return String(i); }
+  return "";
+}
+
+function FileBox({label, hint, wb, fileName, onLoad}){
+  const ref=useRef();
   return (
-    <div>
-      <div className={"filebox"+(data?" ok":"")} onClick={()=>ref.current.click()}>
-        <input ref={ref} type="file" accept=".xlsx,.xls" style={{display:"none"}}
-          onChange={async e=>{ const f=e.target.files[0]; if(f) onLoad(await readExcel(f), f.name); }} />
-        <div style={{fontWeight:600, color:"#0f172a"}}>{label}</div>
-        <div className="muted" style={{marginTop:4}}>{data ? `✓ ${data.name} · ${data.rows.length} filas` : hint}</div>
-      </div>
+    <div className={"filebox"+(wb?" ok":"")} onClick={()=>ref.current.click()}>
+      <input ref={ref} type="file" accept=".xlsx,.xls" style={{display:"none"}}
+        onChange={async e=>{ const f=e.target.files[0]; if(f) onLoad(await readWB(f), f.name); }} />
+      <div style={{fontWeight:600, color:"#0f172a"}}>{label}</div>
+      <div className="muted" style={{marginTop:4}}>{wb ? `\u2713 ${fileName} \u00b7 ${wb.length} hoja(s)` : hint}</div>
     </div>
   );
 }
@@ -125,8 +146,8 @@ function MapSelect({label, value, headers, onChange, optional}){
     <div>
       <label className="fld">{label}{optional && <span style={{color:"#94a3b8"}}> (opcional)</span>}</label>
       <select value={value} onChange={e=>onChange(e.target.value)}>
-        <option value="">— elige una columna —</option>
-        {headers.map(h=><option key={h} value={h}>{h}</option>)}
+        <option value="">\u2014 elige una columna \u2014</option>
+        {headers.map((h,i)=><option key={i} value={i}>{h}</option>)}
       </select>
     </div>
   );
@@ -137,9 +158,8 @@ function BarUsuarios({rows}){
   useEffect(()=>{
     if(!ref.current) return;
     if(chart.current) chart.current.destroy();
-    chart.current = new Chart(ref.current, {
-      type:"bar",
-      data:{ labels: rows.map(r=>r.usuario),
+    chart.current=new Chart(ref.current,{ type:"bar",
+      data:{ labels:rows.map(r=>r.usuario),
         datasets:[
           {label:"Facturados", data:rows.map(r=>r.fact), backgroundColor:FACT, borderRadius:4},
           {label:"No facturados", data:rows.map(r=>r.no), backgroundColor:NOFA, borderRadius:4},
@@ -147,8 +167,7 @@ function BarUsuarios({rows}){
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{legend:{labels:{font:{size:12}}}},
         scales:{ x:{ticks:{font:{size:11}}, grid:{display:false}},
-                 y:{ticks:{font:{size:11}}, grid:{color:"#f1f5f9"}} } }
-    });
+                 y:{ticks:{font:{size:11}}, grid:{color:"#f1f5f9"}} } } });
     return ()=>chart.current && chart.current.destroy();
   },[rows]);
   return <div style={{height:330}}><canvas ref={ref}></canvas></div>;
@@ -156,180 +175,215 @@ function BarUsuarios({rows}){
 
 function App(){
   const [tab,setTab]=useState("cargar");
-  const [sigad,setSigad]=useState(null);   // {headers, rows, name}
-  const [drive,setDrive]=useState(null);
+  const [sigWB,setSigWB]=useState(null); const [sigName,setSigName]=useState("");
+  const [drvWB,setDrvWB]=useState(null); const [drvName,setDrvName]=useState("");
+  const [sigSheet,setSigSheet]=useState(0); const [sigHR,setSigHR]=useState(0);
+  const [drvSheet,setDrvSheet]=useState(0); const [drvHR,setDrvHR]=useState(0);
   const [m,setM]=useState({sigDesp:"",sigCli:"",sigAdu:"",sigProv:"",drvDesp:"",drvEst:"",drvFact:""});
-  const [pend,setPend]=useState([]);        // estados pendientes a trabajar
-  const [factSt,setFactSt]=useState([]);    // estados que cuentan como facturado
+  const [pend,setPend]=useState([]); const [factSt,setFactSt]=useState([]);
   const [defPerson,setDefPerson]=useState("zbaeza");
   const [people,setPeople]=useState(PEOPLE_DEF);
-  const [conf,setConf]=useState(CONF_DEF);
-  const [newConf,setNewConf]=useState("");
+  const [conf,setConf]=useState(CONF_DEF); const [newConf,setNewConf]=useState("");
   const [first5,setFirst5]=useState(isFirst5BizDays());
   const [result,setResult]=useState(null);
 
-  const ready = sigad && drive;
+  const ready = sigWB && drvWB;
 
-  // Autocompleta los mapeos al cargar archivos
-  const loadSigad=(d,name)=>{ setSigad({...d,name});
-    setM(p=>({...p, sigDesp:guess(d.headers,["despach"]), sigCli:guess(d.headers,["client"]),
-      sigAdu:guess(d.headers,["aduana"]), sigProv:guess(d.headers,["prestad","provee"]) })); };
-  const loadDrive=(d,name)=>{ setDrive({...d,name});
-    setM(p=>({...p, drvDesp:guess(d.headers,["despach"]), drvEst:guess(d.headers,["estad"]),
-      drvFact:guess(d.headers,["factur","asign","usuario","encargad"]) })); };
+  // Construye las tablas según hoja + fila de encabezado elegidas
+  const sig = useMemo(()=> sigWB ? buildTable(sigWB[sigSheet].aoa, sigHR) : null, [sigWB,sigSheet,sigHR]);
+  const drv = useMemo(()=> drvWB ? buildTable(drvWB[drvSheet].aoa, drvHR) : null, [drvWB,drvSheet,drvHR]);
 
-  // Valores distintos de la columna de estado en Drive
+  function loadSig(wb,name){
+    setSigWB(wb); setSigName(name); setSigSheet(0);
+    const hr=detectHeaderRow(wb[0].aoa); setSigHR(hr);
+    const {headers}=buildTable(wb[0].aoa,hr);
+    setM(p=>({...p, sigDesp:guessIdx(headers,["despach"]), sigCli:guessIdx(headers,["client"]),
+      sigAdu:guessIdx(headers,["aduana"]), sigProv:guessIdx(headers,["prestad","provee"]) }));
+  }
+  function loadDrv(wb,name){
+    setDrvWB(wb); setDrvName(name);
+    const cur=MONTHS[new Date().getMonth()];
+    let idx=wb.findIndex(s=>s.name.toUpperCase().includes(cur));
+    if(idx<0) idx=wb.findIndex(s=>s.aoa.length>2); if(idx<0) idx=0;
+    setDrvSheet(idx);
+    const hr=detectHeaderRow(wb[idx].aoa); setDrvHR(hr);
+    const {headers}=buildTable(wb[idx].aoa,hr);
+    setM(p=>({...p, drvDesp:guessIdx(headers,["despach"]), drvEst:guessIdx(headers,["estad"]),
+      drvFact:guessIdx(headers,["asign","factur"]) }));
+  }
+
+  // Re-detecta encabezado/mapeo al cambiar de hoja en Drive
+  function changeDrvSheet(i){
+    i=Number(i); setDrvSheet(i);
+    const hr=detectHeaderRow(drvWB[i].aoa); setDrvHR(hr);
+    const {headers}=buildTable(drvWB[i].aoa,hr);
+    setM(p=>({...p, drvDesp:guessIdx(headers,["despach"]), drvEst:guessIdx(headers,["estad"]),
+      drvFact:guessIdx(headers,["asign","factur"]) }));
+    setPend([]); setFactSt([]);
+  }
+
   const estadosDistintos = useMemo(()=>{
-    if(!drive || !m.drvEst) return [];
-    const set=new Set(drive.rows.map(r=>norm(r[m.drvEst])).filter(Boolean));
+    if(!drv || m.drvEst==="") return [];
+    const idx=Number(m.drvEst);
+    const set=new Set(drv.rows.map(r=>norm(r[idx])).filter(Boolean));
     return [...set].sort();
-  },[drive,m.drvEst]);
+  },[drv,m.drvEst]);
 
-  // Sugiere estados pendientes por defecto cuando aparecen
+  function sugerirEstados(){
+    setPend(estadosDistintos.filter(e=>e===""||e.includes("REVISAR")||e.includes("VACI")||e.includes("BORRADOR")).concat(
+      estadosDistintos.includes("")?[]:[]));
+    setFactSt(estadosDistintos.filter(e=>e.includes("OK")));
+  }
   useEffect(()=>{
-    if(estadosDistintos.length && pend.length===0){
-      const guessPend = estadosDistintos.filter(e=>
-        ["","VACIO","VACÍO","PARA REVISAR","REVISAR BORRADOR"].includes(e) ||
-        e.includes("REVISAR"));
-      setPend(guessPend);
-    }
-    if(estadosDistintos.length && factSt.length===0){
-      setFactSt(estadosDistintos.filter(e=>e.includes("FACTURAD") && !e.includes("NO")));
+    if(estadosDistintos.length){
+      if(pend.length===0) setPend(estadosDistintos.filter(e=>e===""||e.includes("REVISAR")||e.includes("VACI")||e.includes("BORRADOR")));
+      if(factSt.length===0) setFactSt(estadosDistintos.filter(e=>e.includes("OK")));
     }
   },[estadosDistintos]);
 
-  const toggle=(arr,set,v)=> set(arr.includes(v)? arr.filter(x=>x!==v): [...arr,v]);
-  const isConf = cli => { const c=norm(cli); return conf.some(x=>{const n=norm(x); return n && (c===n || c.includes(n));}); };
+  const toggle=(arr,set,v)=> set(arr.includes(v)?arr.filter(x=>x!==v):[...arr,v]);
+  const isConf=cli=>{ const c=norm(cli); return conf.some(x=>{const n=norm(x); return n && (c===n||c.includes(n));}); };
 
   function generar(){
-    // 1. Limpia SIGAD: deja columnas útiles y quita despachos duplicados
-    const vistos=new Set(); const sig=[];
-    for(const r of sigad.rows){
-      const desp=norm(r[m.sigDesp]); if(!desp || vistos.has(desp)) continue;
-      vistos.add(desp);
-      sig.push({ despacho:r[m.sigDesp], cliente:r[m.sigCli], aduana:r[m.sigAdu], proveedor:r[m.sigProv], _k:desp });
-    }
-    // 2. Filtra Drive a estados pendientes y arma set de despachos
+    const sD=Number(m.sigDesp), sC=Number(m.sigCli), sA=m.sigAdu===""?-1:Number(m.sigAdu), sP=m.sigProv===""?-1:Number(m.sigProv);
+    const dD=Number(m.drvDesp), dE=Number(m.drvEst);
+    // SIGAD: quitar despachos duplicados
+    const vistos=new Set(); const sigClean=[];
+    for(const r of sig.rows){ const k=despKey(r[sD]); if(!k||vistos.has(k)) continue; vistos.add(k);
+      sigClean.push({despacho:r[sD], cliente:r[sC], aduana:sA<0?"":r[sA], proveedor:sP<0?"":r[sP], _k:k}); }
+    // Drive: set de despachos en estados pendientes
     const pendSet=new Set();
-    for(const r of drive.rows){
-      if(pend.includes(norm(r[m.drvEst]))) pendSet.add(norm(r[m.drvDesp]));
-    }
-    // 3. Cruce: deja solo los que están en ambos
-    const cruzados = sig.filter(r=>pendSet.has(r._k));
-    // 4. Asigna
-    let rr=0;
-    const f=today();
-    const out = cruzados.map(r=>{
+    for(const r of drv.rows){ if(pend.includes(norm(r[dE]))) pendSet.add(despKey(r[dD])); }
+    // Cruce
+    const cruzados=sigClean.filter(r=>pendSet.has(r._k));
+    // Asignar
+    let rr=0; const f=today();
+    const out=cruzados.map(r=>{
       let asign, tipo="ok";
       if(isConf(r.cliente)){ asign="Primer facturador (pendiente)"; tipo="conf"; }
-      else if(first5){
-        // reparte en partes iguales entre las personas (sin conf a nadie aquí)
-        asign = people[rr % people.length]; rr++;
-      } else asign = defPerson;
+      else if(first5){ asign=people[rr%people.length]; rr++; }
+      else asign=defPerson;
       return {...r, designado:f, asignacion:asign, tipo};
     });
-    setResult(out);
-    setTab("resultado");
+    setResult(out); setTab("resultado");
   }
 
   function descargar(){
-    const data = result.map(r=>({
-      despacho:r.despacho, cliente:r.cliente, aduana:r.aduana, proveedor:r.proveedor,
-      "designado el":r.designado, asignacion:r.asignacion }));
+    const data=result.map(r=>({despacho:r.despacho, cliente:r.cliente, aduana:r.aduana,
+      proveedor:r.proveedor, "designado el":r.designado, asignacion:r.asignacion}));
     const ws=XLSX.utils.json_to_sheet(data);
     const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Asignacion");
-    XLSX.writeFile(wb, "despachos_asignados_"+today()+".xlsx");
+    XLSX.writeFile(wb,"despachos_asignados_"+today()+".xlsx");
   }
 
-  // Medición para el tablero (desde la planilla Drive)
   const medicion = useMemo(()=>{
-    if(!drive || !m.drvFact || !m.drvEst || factSt.length===0) return null;
-    const map={};
-    for(const r of drive.rows){
-      const u=String(r[m.drvFact]||"").trim(); if(!u) continue;
-      const est=norm(r[m.drvEst]);
-      if(!map[u]) map[u]={usuario:u, fact:0, no:0};
-      if(factSt.includes(est)) map[u].fact++; else map[u].no++;
-    }
-    const rows=Object.values(map).sort((a,b)=>b.fact-a.fact);
+    if(!drv || m.drvFact===""||m.drvEst===""||factSt.length===0) return null;
+    const dF=Number(m.drvFact), dE=Number(m.drvEst); const map={};
+    for(const r of drv.rows){ const u=String(r[dF]||"").trim(); if(!u) continue;
+      const est=norm(r[dE]); if(!map[u]) map[u]={usuario:u,fact:0,no:0};
+      if(factSt.includes(est)) map[u].fact++; else map[u].no++; }
+    const rows=Object.values(map).sort((a,b)=>(b.fact+b.no)-(a.fact+a.no)).slice(0,12);
     return { rows, totalFact:rows.reduce((s,r)=>s+r.fact,0), totalNo:rows.reduce((s,r)=>s+r.no,0) };
-  },[drive,m.drvFact,m.drvEst,factSt]);
+  },[drv,m.drvFact,m.drvEst,factSt]);
+
+  const mapOK = m.sigDesp!==""&&m.sigCli!==""&&m.drvDesp!==""&&m.drvEst!==""&&pend.length>0;
 
   return (
     <div>
-      <header>
-        <div className="wrap" style={{padding:"20px 24px 0"}}>
-          <div className="eyebrow">Círculo de facturación · 2026</div>
-          <h1>Asignador de despachos</h1>
-          <p className="sub">Cruza SIGAD y Drive, asigna y mide — todo en tu navegador, sin instalar nada</p>
-          <div className="tabs" style={{marginTop:16}}>
-            {[["cargar","Cargar"],["ajustes","Ajustes"],["resultado","Resultado"],["tablero","Tablero"]].map(([id,lab])=>(
-              <button key={id} className={"tab"+(tab===id?" active":"")}
-                disabled={(id!=="cargar"&&id!=="ajustes")&&!ready}
-                onClick={()=>setTab(id)}>{lab}</button>
-            ))}
-          </div>
+      <header><div className="wrap" style={{padding:"20px 24px 0"}}>
+        <div className="eyebrow">C\u00edrculo de facturaci\u00f3n \u00b7 2026</div>
+        <h1>Asignador de despachos</h1>
+        <p className="sub">Cruza SIGAD y Drive, asigna y mide \u2014 todo en tu navegador, sin instalar nada</p>
+        <div className="tabs" style={{marginTop:16}}>
+          {[["cargar","Cargar"],["ajustes","Ajustes"],["resultado","Resultado"],["tablero","Tablero"]].map(([id,lab])=>(
+            <button key={id} className={"tab"+(tab===id?" active":"")}
+              disabled={(id==="resultado")&&!result} onClick={()=>setTab(id)}>{lab}</button>))}
         </div>
-      </header>
+      </div></header>
 
       <main><div className="wrap">
 
         {tab==="cargar" && (<>
           <div className="card">
-            <h2>1 · Carga tus dos planillas</h2>
-            <p className="muted">Acepta .xlsx o .xls. Los datos no se suben a ningún servidor; se procesan aquí mismo.</p>
+            <h2>1 \u00b7 Carga tus dos planillas</h2>
+            <p className="muted">Acepta .xlsx o .xls. Los datos no se suben a ning\u00fan servidor; se procesan aqu\u00ed mismo.</p>
             <div className="grid2" style={{marginTop:16}}>
-              <FileBox label="Planilla SIGAD" hint="Haz clic para subir el export de SIGAD" data={sigad} onLoad={loadSigad}/>
-              <FileBox label="Planilla Drive (mes en curso)" hint="Haz clic para subir la planilla de Drive" data={drive} onLoad={loadDrive}/>
+              <FileBox label="Planilla SIGAD" hint="Clic para subir el export de SIGAD" wb={sigWB} fileName={sigName} onLoad={loadSig}/>
+              <FileBox label="Planilla Drive (desembolsos de terceros)" hint="Clic para subir la planilla de Drive" wb={drvWB} fileName={drvName} onLoad={loadDrv}/>
             </div>
           </div>
-          {ready && <div className="card"><h2>Listo</h2><p className="muted">Ambas cargadas. Ve a <b>Ajustes</b> para confirmar las columnas y luego genera la asignación.</p>
-            <button className="btn" style={{marginTop:8}} onClick={()=>setTab("ajustes")}>Ir a Ajustes →</button></div>}
+          {ready && <div className="card">
+            <div className="ok-note">Detect\u00e9 autom\u00e1ticamente: SIGAD \u2192 hoja <b>{sigWB[sigSheet].name}</b>, encabezados en fila <b>{sigHR+1}</b>. Drive \u2192 hoja <b>{drvWB[drvSheet].name}</b>, encabezados en fila <b>{drvHR+1}</b>. Si algo no calza, lo ajustas en <b>Ajustes</b>.</div>
+            <button className="btn" style={{marginTop:14}} onClick={()=>setTab("ajustes")}>Ir a Ajustes \u2192</button>
+          </div>}
         </>)}
 
-        {tab==="ajustes" && (<>
-          {!ready ? <div className="empty">Primero carga las dos planillas en la pestaña <b>Cargar</b>.</div> : <>
+        {tab==="ajustes" && (!ready ? <div className="empty">Primero carga las dos planillas en <b>Cargar</b>.</div> : <>
           <div className="card">
-            <h2>2 · ¿Qué columna es cuál?</h2>
-            <p className="muted">Lo adiviné por el nombre; corrígelo si algo quedó mal.</p>
+            <h2>2 \u00b7 Hoja y fila de encabezados</h2>
+            <p className="muted">Ya las detect\u00e9; corr\u00edgelas solo si hace falta.</p>
             <div className="grid2">
               <div>
-                <div style={{fontWeight:600, fontSize:13, marginTop:12, color:"#475569"}}>Planilla SIGAD</div>
-                <MapSelect label="N° de despacho" value={m.sigDesp} headers={sigad.headers} onChange={v=>setM({...m,sigDesp:v})}/>
-                <MapSelect label="Cliente" value={m.sigCli} headers={sigad.headers} onChange={v=>setM({...m,sigCli:v})}/>
-                <MapSelect label="Aduana" value={m.sigAdu} headers={sigad.headers} onChange={v=>setM({...m,sigAdu:v})}/>
-                <MapSelect label="Prestador / proveedor" value={m.sigProv} headers={sigad.headers} onChange={v=>setM({...m,sigProv:v})}/>
+                <div style={{fontWeight:600,fontSize:13,marginTop:12,color:"#475569"}}>SIGAD</div>
+                <label className="fld">Hoja</label>
+                <select value={sigSheet} onChange={e=>{const i=Number(e.target.value);setSigSheet(i);const hr=detectHeaderRow(sigWB[i].aoa);setSigHR(hr);}}>
+                  {sigWB.map((s,i)=><option key={i} value={i}>{s.name}</option>)}</select>
+                <label className="fld">Fila de encabezados</label>
+                <input type="number" min="1" value={sigHR+1} onChange={e=>setSigHR(Math.max(0,Number(e.target.value)-1))}/>
               </div>
               <div>
-                <div style={{fontWeight:600, fontSize:13, marginTop:12, color:"#475569"}}>Planilla Drive</div>
-                <MapSelect label="N° de despacho" value={m.drvDesp} headers={drive.headers} onChange={v=>setM({...m,drvDesp:v})}/>
-                <MapSelect label="Estado" value={m.drvEst} headers={drive.headers} onChange={v=>setM({...m,drvEst:v})}/>
-                <MapSelect label="Facturador / asignado" optional value={m.drvFact} headers={drive.headers} onChange={v=>setM({...m,drvFact:v})}/>
+                <div style={{fontWeight:600,fontSize:13,marginTop:12,color:"#475569"}}>Drive</div>
+                <label className="fld">Hoja (mes)</label>
+                <select value={drvSheet} onChange={e=>changeDrvSheet(e.target.value)}>
+                  {drvWB.map((s,i)=><option key={i} value={i}>{s.name}</option>)}</select>
+                <label className="fld">Fila de encabezados</label>
+                <input type="number" min="1" value={drvHR+1} onChange={e=>setDrvHR(Math.max(0,Number(e.target.value)-1))}/>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <h2>3 \u00b7 \u00bfQu\u00e9 columna es cu\u00e1l?</h2>
+            <div className="grid2">
+              <div>
+                <div style={{fontWeight:600,fontSize:13,marginTop:8,color:"#475569"}}>Planilla SIGAD</div>
+                <MapSelect label="N\u00b0 de despacho" value={m.sigDesp} headers={sig.headers} onChange={v=>setM({...m,sigDesp:v})}/>
+                <MapSelect label="Cliente" value={m.sigCli} headers={sig.headers} onChange={v=>setM({...m,sigCli:v})}/>
+                <MapSelect label="Aduana" optional value={m.sigAdu} headers={sig.headers} onChange={v=>setM({...m,sigAdu:v})}/>
+                <MapSelect label="Prestador / proveedor" optional value={m.sigProv} headers={sig.headers} onChange={v=>setM({...m,sigProv:v})}/>
+              </div>
+              <div>
+                <div style={{fontWeight:600,fontSize:13,marginTop:8,color:"#475569"}}>Planilla Drive</div>
+                <MapSelect label="N\u00b0 de despacho" value={m.drvDesp} headers={drv.headers} onChange={v=>setM({...m,drvDesp:v})}/>
+                <MapSelect label="Estado" value={m.drvEst} headers={drv.headers} onChange={v=>setM({...m,drvEst:v})}/>
+                <MapSelect label="Facturador / asignado" optional value={m.drvFact} headers={drv.headers} onChange={v=>setM({...m,drvFact:v})}/>
               </div>
             </div>
           </div>
 
           {estadosDistintos.length>0 && <div className="card">
-            <h2>3 · Estados</h2>
-            <label className="fld">Estados que cuentan como “pendiente por trabajar” (se hace el cruce con estos)</label>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <h2>4 \u00b7 Estados</h2>
+              <button className="btn ghost sm" onClick={sugerirEstados}>Sugerir</button>
+            </div>
+            <label className="fld">Pendientes por trabajar (se cruza con estos)</label>
             <div className="checks">{estadosDistintos.map(e=>(
-              <label key={e}><input type="checkbox" checked={pend.includes(e)} onChange={()=>toggle(pend,setPend,e)}/>{e||"(vacío)"}</label>))}</div>
-            <label className="fld" style={{marginTop:16}}>Estados que cuentan como “facturado” (para el tablero)</label>
+              <label key={e}><input type="checkbox" checked={pend.includes(e)} onChange={()=>toggle(pend,setPend,e)}/>{e||"(vac\u00edo)"}</label>))}</div>
+            <label className="fld" style={{marginTop:16}}>Cuentan como \u201cfacturado\u201d (para el tablero)</label>
             <div className="checks">{estadosDistintos.map(e=>(
-              <label key={e}><input type="checkbox" checked={factSt.includes(e)} onChange={()=>toggle(factSt,setFactSt,e)}/>{e||"(vacío)"}</label>))}</div>
+              <label key={e}><input type="checkbox" checked={factSt.includes(e)} onChange={()=>toggle(factSt,setFactSt,e)}/>{e||"(vac\u00edo)"}</label>))}</div>
           </div>}
 
           <div className="card">
-            <h2>4 · Reglas de asignación</h2>
+            <h2>5 \u00b7 Reglas de asignaci\u00f3n</h2>
             <div className="grid2">
               <div>
                 <label className="fld">Persona por defecto (recibe casi todo)</label>
                 <input type="text" value={defPerson} onChange={e=>setDefPerson(e.target.value)}/>
                 <label className="fld" style={{marginTop:14}}>
                   <input type="checkbox" checked={first5} onChange={e=>setFirst5(e.target.checked)} style={{width:"auto",marginRight:8}}/>
-                  Repartir entre las 5 personas (primeros 5 días hábiles)
-                </label>
-                <p className="muted" style={{marginTop:4}}>{isFirst5BizDays()?"Hoy estás dentro de los primeros 5 días hábiles.":"Hoy NO estás en los primeros 5 días hábiles."}</p>
+                  Repartir entre las 5 personas (primeros 5 d\u00edas h\u00e1biles)</label>
+                <p className="muted" style={{marginTop:4}}>{isFirst5BizDays()?"Hoy est\u00e1s dentro de los primeros 5 d\u00edas h\u00e1biles.":"Hoy NO est\u00e1s en los primeros 5 d\u00edas h\u00e1biles."}</p>
               </div>
               <div>
                 <label className="fld">Las 5 personas del reparto</label>
@@ -340,41 +394,37 @@ function App(){
           </div>
 
           <div className="card">
-            <h2>5 · Clientes de Confirmación de Gastos</h2>
-            <p className="muted">Sus despachos se asignan al “primer facturador”. Agrega o quita sin tocar código.</p>
-            <div style={{display:"flex", gap:8, marginTop:12}}>
+            <h2>6 \u00b7 Clientes de Confirmaci\u00f3n de Gastos</h2>
+            <p className="muted">Sus despachos se asignan al \u201cprimer facturador\u201d. Agrega o quita sin tocar c\u00f3digo.</p>
+            <div style={{display:"flex",gap:8,marginTop:12}}>
               <input type="text" value={newConf} placeholder="Nombre del cliente"
                 onChange={e=>setNewConf(e.target.value)}
-                onKeyDown={e=>{ if(e.key==="Enter"&&newConf.trim()){ setConf([...conf,newConf.trim().toUpperCase()]); setNewConf(""); } }}/>
-              <button className="btn dark" onClick={()=>{ if(newConf.trim()){ setConf([...conf,newConf.trim().toUpperCase()]); setNewConf(""); } }}>Agregar</button>
+                onKeyDown={e=>{if(e.key==="Enter"&&newConf.trim()){setConf([...conf,newConf.trim().toUpperCase()]);setNewConf("");}}}/>
+              <button className="btn dark" onClick={()=>{if(newConf.trim()){setConf([...conf,newConf.trim().toUpperCase()]);setNewConf("");}}}>Agregar</button>
             </div>
             <div className="chips">{conf.map((c,i)=>(
-              <span className="chip" key={c+i}>{c}<button onClick={()=>setConf(conf.filter((_,j)=>j!==i))}>✕</button></span>))}</div>
+              <span className="chip" key={c+i}>{c}<button onClick={()=>setConf(conf.filter((_,j)=>j!==i))}>\u2715</button></span>))}</div>
           </div>
 
-          <button className="btn" style={{fontSize:15, padding:"11px 22px"}}
-            disabled={!m.sigDesp||!m.sigCli||!m.drvDesp||!m.drvEst||pend.length===0}
-            onClick={generar}>Generar asignación →</button>
-          {(!m.sigDesp||!m.sigCli||!m.drvDesp||!m.drvEst||pend.length===0) &&
-            <p className="muted" style={{marginTop:8}}>Completa los mapeos de despacho/cliente/estado y marca al menos un estado pendiente.</p>}
-        </>}
+          <button className="btn" style={{fontSize:15,padding:"11px 22px"}} disabled={!mapOK} onClick={generar}>Generar asignaci\u00f3n \u2192</button>
+          {!mapOK && <p className="muted" style={{marginTop:8}}>Completa despacho/cliente/estado y marca al menos un estado pendiente.</p>}
         </>)}
 
-        {tab==="resultado" && (
-          !result ? <div className="empty">Genera la asignación desde la pestaña <b>Ajustes</b>.</div> : <>
+        {tab==="resultado" && (!result ? <div className="empty">Genera la asignaci\u00f3n desde <b>Ajustes</b>.</div> : <>
           <div className="grid3" style={{marginBottom:20}}>
             <div className="stat"><div className="lab">Despachos por trabajar</div><div className="val">{result.length}</div></div>
-            <div className="stat"><div className="lab">Confirmación de gastos</div><div className="val" style={{color:FACT}}>{result.filter(r=>r.tipo==="conf").length}</div></div>
-            <div className="stat"><div className="lab">Modo</div><div className="val" style={{fontSize:18, paddingTop:8}}>{first5?"Reparto 5 días":"Persona por defecto"}</div></div>
+            <div className="stat"><div className="lab">Confirmaci\u00f3n de gastos</div><div className="val" style={{color:FACT}}>{result.filter(r=>r.tipo==="conf").length}</div></div>
+            <div className="stat"><div className="lab">Modo</div><div className="val" style={{fontSize:18,paddingTop:8}}>{first5?"Reparto 5 d\u00edas":"Persona por defecto"}</div></div>
           </div>
-          <div className="card" style={{padding:0, overflow:"hidden"}}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"16px 20px", borderBottom:"1px solid #f1f5f9"}}>
+          {result.length===0 && <div className="note">El cruce no encontr\u00f3 coincidencias. Revisa en <b>Ajustes</b> que el N\u00b0 de despacho est\u00e9 bien mapeado en ambas planillas y que los estados pendientes sean los correctos.</div>}
+          <div className="card" style={{padding:0,overflow:"hidden"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",borderBottom:"1px solid #f1f5f9"}}>
               <h2 style={{margin:0}}>Excel final</h2>
-              <button className="btn" onClick={descargar}>⬇ Descargar Excel</button>
+              <button className="btn" onClick={descargar} disabled={result.length===0}>\u2b07 Descargar Excel</button>
             </div>
-            <div style={{overflowX:"auto", maxHeight:480, overflowY:"auto"}}>
+            <div style={{overflowX:"auto",maxHeight:480,overflowY:"auto"}}>
               <table>
-                <thead><tr>{["Despacho","Cliente","Aduana","Proveedor","Designado el","Asignación"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <thead><tr>{["Despacho","Cliente","Aduana","Proveedor","Designado el","Asignaci\u00f3n"].map(h=><th key={h}>{h}</th>)}</tr></thead>
                 <tbody>{result.map((r,i)=>(
                   <tr key={i}>
                     <td style={{color:"#64748b"}}>{r.despacho}</td>
@@ -389,26 +439,24 @@ function App(){
           </div>
         </>)}
 
-        {tab==="tablero" && (
-          !medicion ? <div className="empty">Para el tablero, en <b>Ajustes</b> mapea la columna “Facturador / asignado” y marca qué estados son “facturado”.</div> : <>
+        {tab==="tablero" && (!ready ? <div className="empty">Primero carga las planillas.</div> : !medicion ? <div className="empty">En <b>Ajustes</b> mapea \u201cFacturador / asignado\u201d y marca qu\u00e9 estados son \u201cfacturado\u201d.</div> : <>
           <div className="grid3" style={{marginBottom:20}}>
             <div className="stat"><div className="lab">Facturados</div><div className="val" style={{color:FACT}}>{medicion.totalFact.toLocaleString("es-CL")}</div></div>
             <div className="stat"><div className="lab">No facturados</div><div className="val" style={{color:NOFA}}>{medicion.totalNo.toLocaleString("es-CL")}</div></div>
-            <div className="stat"><div className="lab">% facturado</div><div className="val">{Math.round(medicion.totalFact/(medicion.totalFact+medicion.totalNo)*100)||0}%</div></div>
+            <div className="stat"><div className="lab">% facturado</div><div className="val">{Math.round(medicion.totalFact/((medicion.totalFact+medicion.totalNo)||1)*100)}%</div></div>
           </div>
           <div className="card">
             <h2>Facturados y no facturados por usuario</h2>
-            <p className="muted" style={{marginBottom:12}}>Calculado desde la planilla de Drive · pasa el mouse para ver el detalle</p>
+            <p className="muted" style={{marginBottom:12}}>Hoja <b>{drvWB[drvSheet].name}</b> \u00b7 calculado desde la planilla de Drive</p>
             <BarUsuarios rows={medicion.rows}/>
           </div>
-          <div className="note">El historial mes a mes (la tendencia) se agrega en el siguiente paso, cuando definamos dónde guardar las mediciones de cada mes. Por ahora el tablero mide el mes que cargaste.</div>
+          <div className="note">El historial mes a mes (tendencia) se agrega en el siguiente paso, cuando definamos d\u00f3nde guardar las mediciones. Por ahora el tablero mide la hoja del mes que elegiste.</div>
         </>)}
 
       </div></main>
     </div>
   );
 }
-
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
