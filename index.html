@@ -71,10 +71,9 @@ const FACT = "#4f46e5", NOFA = "#fb7185";
 const PEOPLE_DEF = ["zbaeza","lurtubia","vanessahernandez","vretamales","jcisternas"];
 const MONTHS = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPT","OCT","NOV","DIC"];
 
-// --- Reglas de estado fijas ---
-// Pendientes por trabajar (para el cruce): "" = vacio
+// Reglas de estado fijas. Pendientes para el cruce ("" = vacio):
 const PENDIENTE = ["", "PARA REVISAR", "REVISAR BORRADOR"];
-// Facturados (para la medicion)
+// Facturados para la medicion:
 const FACTURADO = ["OK","PARA DEVOLUCION","AJUSTE OK","AJUSTE CONTABILIDAD","DEVOLUCION TOTAL","EGRESO CREADO DESEMBOLSOS SIN RENDIR","TRANSFERENCIA DUPLICADA"];
 
 const CONF_DEF = ["A & C EQUIPO GASTRONOMICO","ABENGOA CHILE S.A.","AERONAUTICAL SUPPLIES SPA","AGRICOLA POBENA S.A.","AGRONUTRICION SPA","AGROGUASH SPA","AMSEC SPA","ANILINAS MONTBLAC","ASCEND LABORATORIES SPA","AUSTIN CHILE TRADING","BASCA","BRISTOL MYERS SQUIBB DE CHILE","BARNICES ANDINOS SPA","BOTANICAL SOLUTIONS SPA","COM. CARISUR LTDA","CALIDRA","CENTRAL DE REST ARAMARK","CIA.ELECTROMETALURGICA","COMERCIAL HIDROCENTRO S.A.","COMERCIAL DICALLA S.A.","COMERCIAL PROCOMEC LIMITADA","COMERCIAL RTI SPA","COMERCIAL RNK LIMITADA","COMERCIAL. LOS ROBLES","COM Y SERV SUN RENTAL CHILE","COMERCIALIZADORA CHEGO CHEGO SPA","CRUCERO S.A.","CURTIEMBRE BASKA S A","D-LAYOUT","DIMERC","DJ","DOÑA ANTONIA SOLAR","EGLO CHILE ILUMINACION LTDA","EMARESA, INGENIEROS Y REPR.","EBRO STAFSJO VALVES CHILE","EUROFARMA CHILE SPA","FABRICA DE CALZADOS GINO S.A.","FLEISCHMANN CHILE S.A.","FESANCO SPA","FRANKLIN ELEC.(CHILE) LIMITADA","GENERAL PRODUCTS CHILE S.A.","GINO","GOTT SPA","GREAT PLAINS STAINLESS S.A.","GREAT SOLUCION","GRID SOLUTIONS CHILE SA","GRUPO LATYN SA","GYM LOGISTIC","IMPORTADORA RAGU SPA","IMPORTADORA DINAR S.R. LTDA.","INV. FOTOVOLTAICAS SPA","IMP.Y COM.ALIANZA COMER. SPA","IMPALSA SPA","IMPORTADORA Y COMERCIALIZDORA TRIPANTU SPA","INGENIERIA CARO Y CARO LTDA.","ITA SPA","JACUZZI CHILE S.A","JORGUE DE CAMINO","LUVAL S.A.","MAT.Y COMP.INDUST.METACOM","MATTEL","METKA","MIXTAIL S.A.","MECHANICAL AND PIPING SOLUTIONS SPA","MIYSTAIL","TAMARICO SOLAR DOS SPA","P Y P","PLANTA SOLAR TOCOPILLA SPA","PAL LOGISTICS","PE Y PE S.A.","PENA SPOERER Y CIA S.A.","PERI CHILE ENCOFRADOS Y AND","PERNOSTOCK LTDA","POWER TRANSMISSION S SPA","PESCO RENTAL","PRINAL","RAUL TAGLE E HIJOS LTDA","ROMINA FERNANDA LOPEZ","SEMILLAS TUNICHE","SERV.DE REHA.IND.CIPP CHILE SA","SILEN","SIMMA","SMURFIT KAPPA DE CHILE S.A.","SOC. COM. LORCA Y ESTIBILL LIMITADA","SUN RENTAL","VERTIV CONO SUR LIMITADA","WONTECH","XYLEM WATER SOLUTIONS CHILE"];
@@ -125,9 +124,12 @@ function buildTable(aoa, hr){
   return { headers, rows };
 }
 
+// Adivina el indice de columna: prioriza coincidencia exacta, luego que empiece, luego que contenga
 function guessIdx(headers, keys){
-  for(let i=0;i<headers.length;i++){ const n=headers[i].toLowerCase();
-    if(keys.some(k=>n.includes(k))) return String(i); }
+  const low = headers.map(h=>h.toLowerCase().trim());
+  for(const k of keys){ const i=low.indexOf(k); if(i>=0) return String(i); }
+  for(const k of keys){ const i=low.findIndex(h=>h.startsWith(k)); if(i>=0) return String(i); }
+  for(const k of keys){ const i=low.findIndex(h=>h.includes(k)); if(i>=0) return String(i); }
   return "";
 }
 
@@ -138,7 +140,7 @@ function FileBox({label, hint, wb, fileName, onLoad}){
       <input ref={ref} type="file" accept=".xlsx,.xls" style={{display:"none"}}
         onChange={async e=>{ const f=e.target.files[0]; if(f) onLoad(await readWB(f), f.name); }} />
       <div style={{fontWeight:600, color:"#0f172a"}}>{label}</div>
-      <div className="muted" style={{marginTop:4}}>{wb ? `\u2713 ${fileName} \u00b7 ${wb.length} hoja(s)` : hint}</div>
+      <div className="muted" style={{marginTop:4}}>{wb ? ("✓ " + fileName + " · " + wb.length + " hoja(s)") : hint}</div>
     </div>
   );
 }
@@ -148,7 +150,7 @@ function MapSelect({label, value, headers, onChange, optional}){
     <div>
       <label className="fld">{label}{optional && <span style={{color:"#94a3b8"}}> (opcional)</span>}</label>
       <select value={value} onChange={e=>onChange(e.target.value)}>
-        <option value="">\u2014 elige una columna \u2014</option>
+        <option value="">— elige una columna —</option>
         {headers.map((h,i)=><option key={i} value={i}>{h}</option>)}
       </select>
     </div>
@@ -193,12 +195,20 @@ function App(){
   const sig = useMemo(()=> sigWB ? buildTable(sigWB[sigSheet].aoa, sigHR) : null, [sigWB,sigSheet,sigHR]);
   const drv = useMemo(()=> drvWB ? buildTable(drvWB[drvSheet].aoa, drvHR) : null, [drvWB,drvSheet,drvHR]);
 
+  function mapSig(headers){
+    return { sigDesp:guessIdx(headers,["despacho","despach"]), sigCli:guessIdx(headers,["cliente","client"]),
+      sigAdu:guessIdx(headers,["aduana"]), sigProv:guessIdx(headers,["prestador del servicio","prestador","proveedor"]) };
+  }
+  function mapDrv(headers){
+    return { drvDesp:guessIdx(headers,["despacho","despach"]), drvEst:guessIdx(headers,["estado","estad"]),
+      drvFact:guessIdx(headers,["asignacion","asignado","facturador","factur"]) };
+  }
+
   function loadSig(wb,name){
     setSigWB(wb); setSigName(name); setSigSheet(0);
     const hr=detectHeaderRow(wb[0].aoa); setSigHR(hr);
     const {headers}=buildTable(wb[0].aoa,hr);
-    setM(p=>({...p, sigDesp:guessIdx(headers,["despach"]), sigCli:guessIdx(headers,["client"]),
-      sigAdu:guessIdx(headers,["aduana"]), sigProv:guessIdx(headers,["prestad","provee"]) }));
+    setM(p=>({...p, ...mapSig(headers)}));
   }
   function loadDrv(wb,name){
     setDrvWB(wb); setDrvName(name);
@@ -208,15 +218,13 @@ function App(){
     setDrvSheet(idx);
     const hr=detectHeaderRow(wb[idx].aoa); setDrvHR(hr);
     const {headers}=buildTable(wb[idx].aoa,hr);
-    setM(p=>({...p, drvDesp:guessIdx(headers,["despach"]), drvEst:guessIdx(headers,["estad"]),
-      drvFact:guessIdx(headers,["asign","factur"]) }));
+    setM(p=>({...p, ...mapDrv(headers)}));
   }
   function changeDrvSheet(i){
     i=Number(i); setDrvSheet(i);
     const hr=detectHeaderRow(drvWB[i].aoa); setDrvHR(hr);
     const {headers}=buildTable(drvWB[i].aoa,hr);
-    setM(p=>({...p, drvDesp:guessIdx(headers,["despach"]), drvEst:guessIdx(headers,["estad"]),
-      drvFact:guessIdx(headers,["asign","factur"]) }));
+    setM(p=>({...p, ...mapDrv(headers)}));
   }
 
   const isConf=cli=>{ const c=norm(cli); return conf.some(x=>{const n=norm(x); return n && (c===n||c.includes(n));}); };
@@ -227,7 +235,6 @@ function App(){
     const vistos=new Set(); const sigClean=[];
     for(const r of sig.rows){ const k=despKey(r[sD]); if(!k||vistos.has(k)) continue; vistos.add(k);
       sigClean.push({despacho:r[sD], cliente:r[sC], aduana:sA<0?"":r[sA], proveedor:sP<0?"":r[sP], _k:k}); }
-    // Filtro Drive: pendientes por trabajar (regla fija)
     const pendSet=new Set();
     for(const r of drv.rows){ if(PENDIENTE.includes(normEst(r[dE]))) pendSet.add(despKey(r[dD])); }
     const cruzados=sigClean.filter(r=>pendSet.has(r._k));
@@ -250,7 +257,6 @@ function App(){
     XLSX.writeFile(wb,"despachos_asignados_"+today()+".xlsx");
   }
 
-  // Medicion: facturado = estado en FACTURADO (regla fija); el resto = no facturado
   const medicion = useMemo(()=>{
     if(!drv || m.drvFact===""||m.drvEst==="") return null;
     const dF=Number(m.drvFact), dE=Number(m.drvEst); const map={};
@@ -266,9 +272,9 @@ function App(){
   return (
     <div>
       <header><div className="wrap" style={{padding:"20px 24px 0"}}>
-        <div className="eyebrow">C\u00edrculo de facturaci\u00f3n \u00b7 2026</div>
+        <div className="eyebrow">Círculo de facturación · 2026</div>
         <h1>Asignador de despachos</h1>
-        <p className="sub">Cruza SIGAD y Drive, asigna y mide \u2014 todo en tu navegador, sin instalar nada</p>
+        <p className="sub">Cruza SIGAD y Drive, asigna y mide — todo en tu navegador, sin instalar nada</p>
         <div className="tabs" style={{marginTop:16}}>
           {[["cargar","Cargar"],["ajustes","Ajustes"],["resultado","Resultado"],["tablero","Tablero"]].map(([id,lab])=>(
             <button key={id} className={"tab"+(tab===id?" active":"")}
@@ -280,31 +286,31 @@ function App(){
 
         {tab==="cargar" && (<>
           <div className="card">
-            <h2>1 \u00b7 Carga tus dos planillas</h2>
-            <p className="muted">Acepta .xlsx o .xls. Los datos no se suben a ning\u00fan servidor; se procesan aqu\u00ed mismo.</p>
+            <h2>1 · Carga tus dos planillas</h2>
+            <p className="muted">Acepta .xlsx o .xls. Los datos no se suben a ningún servidor; se procesan aquí mismo.</p>
             <div className="grid2" style={{marginTop:16}}>
               <FileBox label="Planilla SIGAD" hint="Clic para subir el export de SIGAD" wb={sigWB} fileName={sigName} onLoad={loadSig}/>
               <FileBox label="Planilla Drive (desembolsos de terceros)" hint="Clic para subir la planilla de Drive" wb={drvWB} fileName={drvName} onLoad={loadDrv}/>
             </div>
           </div>
           {ready && <div className="card">
-            <div className="ok-note">Detect\u00e9: SIGAD \u2192 hoja <b>{sigWB[sigSheet].name}</b>, encabezados en fila <b>{sigHR+1}</b>. Drive \u2192 hoja <b>{drvWB[drvSheet].name}</b>, encabezados en fila <b>{drvHR+1}</b>. Si algo no calza, lo ajustas en <b>Ajustes</b>.</div>
-            <button className="btn" style={{marginTop:14}} onClick={()=>setTab("ajustes")}>Ir a Ajustes \u2192</button>
+            <div className="ok-note">Detecté: SIGAD → hoja <b>{sigWB[sigSheet].name}</b>, encabezados en fila <b>{sigHR+1}</b>. Drive → hoja <b>{drvWB[drvSheet].name}</b>, encabezados en fila <b>{drvHR+1}</b>. Si algo no calza, lo ajustas en <b>Ajustes</b>.</div>
+            <button className="btn" style={{marginTop:14}} onClick={()=>setTab("ajustes")}>Ir a Ajustes →</button>
           </div>}
         </>)}
 
         {tab==="ajustes" && (!ready ? <div className="empty">Primero carga las dos planillas en <b>Cargar</b>.</div> : <>
           <div className="card">
-            <h2>2 \u00b7 Hoja y fila de encabezados</h2>
-            <p className="muted">Ya las detect\u00e9; corr\u00edgelas solo si hace falta.</p>
+            <h2>2 · Hoja y fila de encabezados</h2>
+            <p className="muted">Ya las detecté; corrígelas solo si hace falta.</p>
             <div className="grid2">
               <div>
                 <div style={{fontWeight:600,fontSize:13,marginTop:12,color:"#475569"}}>SIGAD</div>
                 <label className="fld">Hoja</label>
-                <select value={sigSheet} onChange={e=>{const i=Number(e.target.value);setSigSheet(i);const hr=detectHeaderRow(sigWB[i].aoa);setSigHR(hr);}}>
+                <select value={sigSheet} onChange={e=>{const i=Number(e.target.value);setSigSheet(i);const hr=detectHeaderRow(sigWB[i].aoa);setSigHR(hr);const {headers}=buildTable(sigWB[i].aoa,hr);setM(p=>({...p,...mapSig(headers)}));}}>
                   {sigWB.map((s,i)=><option key={i} value={i}>{s.name}</option>)}</select>
                 <label className="fld">Fila de encabezados</label>
-                <input type="number" min="1" value={sigHR+1} onChange={e=>setSigHR(Math.max(0,Number(e.target.value)-1))}/>
+                <input type="number" min="1" value={sigHR+1} onChange={e=>{const hr=Math.max(0,Number(e.target.value)-1);setSigHR(hr);const {headers}=buildTable(sigWB[sigSheet].aoa,hr);setM(p=>({...p,...mapSig(headers)}));}}/>
               </div>
               <div>
                 <div style={{fontWeight:600,fontSize:13,marginTop:12,color:"#475569"}}>Drive</div>
@@ -312,45 +318,45 @@ function App(){
                 <select value={drvSheet} onChange={e=>changeDrvSheet(e.target.value)}>
                   {drvWB.map((s,i)=><option key={i} value={i}>{s.name}</option>)}</select>
                 <label className="fld">Fila de encabezados</label>
-                <input type="number" min="1" value={drvHR+1} onChange={e=>setDrvHR(Math.max(0,Number(e.target.value)-1))}/>
+                <input type="number" min="1" value={drvHR+1} onChange={e=>{const hr=Math.max(0,Number(e.target.value)-1);setDrvHR(hr);const {headers}=buildTable(drvWB[drvSheet].aoa,hr);setM(p=>({...p,...mapDrv(headers)}));}}/>
               </div>
             </div>
           </div>
 
           <div className="card">
-            <h2>3 \u00b7 \u00bfQu\u00e9 columna es cu\u00e1l?</h2>
+            <h2>3 · ¿Qué columna es cuál?</h2>
             <div className="grid2">
               <div>
                 <div style={{fontWeight:600,fontSize:13,marginTop:8,color:"#475569"}}>Planilla SIGAD</div>
-                <MapSelect label="N\u00b0 de despacho" value={m.sigDesp} headers={sig.headers} onChange={v=>setM({...m,sigDesp:v})}/>
+                <MapSelect label="N° de despacho" value={m.sigDesp} headers={sig.headers} onChange={v=>setM({...m,sigDesp:v})}/>
                 <MapSelect label="Cliente" value={m.sigCli} headers={sig.headers} onChange={v=>setM({...m,sigCli:v})}/>
                 <MapSelect label="Aduana" optional value={m.sigAdu} headers={sig.headers} onChange={v=>setM({...m,sigAdu:v})}/>
                 <MapSelect label="Prestador / proveedor" optional value={m.sigProv} headers={sig.headers} onChange={v=>setM({...m,sigProv:v})}/>
               </div>
               <div>
                 <div style={{fontWeight:600,fontSize:13,marginTop:8,color:"#475569"}}>Planilla Drive</div>
-                <MapSelect label="N\u00b0 de despacho" value={m.drvDesp} headers={drv.headers} onChange={v=>setM({...m,drvDesp:v})}/>
+                <MapSelect label="N° de despacho" value={m.drvDesp} headers={drv.headers} onChange={v=>setM({...m,drvDesp:v})}/>
                 <MapSelect label="Estado" value={m.drvEst} headers={drv.headers} onChange={v=>setM({...m,drvEst:v})}/>
                 <MapSelect label="Facturador / asignado" optional value={m.drvFact} headers={drv.headers} onChange={v=>setM({...m,drvFact:v})}/>
               </div>
             </div>
             <div className="info" style={{marginTop:16}}>
-              <b>Reglas de estado (autom\u00e1ticas):</b><br/>
-              Para el cruce, son <b>pendientes por trabajar</b>: vac\u00edo, para revisar, revisar borrador.<br/>
-              Para la medici\u00f3n, cuentan como <b>facturados</b>: OK, para devoluci\u00f3n, ajuste OK, ajuste contabilidad, devoluci\u00f3n total, egreso creado desembolsos sin rendir, transferencia duplicada. El resto es no facturado.
+              <b>Reglas de estado (automáticas):</b><br/>
+              Para el cruce, son <b>pendientes por trabajar</b>: vacío, para revisar, revisar borrador.<br/>
+              Para la medición, cuentan como <b>facturados</b>: OK, para devolución, ajuste OK, ajuste contabilidad, devolución total, egreso creado desembolsos sin rendir, transferencia duplicada. El resto es no facturado.
             </div>
           </div>
 
           <div className="card">
-            <h2>4 \u00b7 Reglas de asignaci\u00f3n</h2>
+            <h2>4 · Reglas de asignación</h2>
             <div className="grid2">
               <div>
                 <label className="fld">Persona por defecto (recibe casi todo)</label>
                 <input type="text" value={defPerson} onChange={e=>setDefPerson(e.target.value)}/>
                 <label className="fld" style={{marginTop:14}}>
                   <input type="checkbox" checked={first5} onChange={e=>setFirst5(e.target.checked)} style={{width:"auto",marginRight:8}}/>
-                  Repartir entre las 5 personas (primeros 5 d\u00edas h\u00e1biles)</label>
-                <p className="muted" style={{marginTop:4}}>{isFirst5BizDays()?"Hoy est\u00e1s dentro de los primeros 5 d\u00edas h\u00e1biles.":"Hoy NO est\u00e1s en los primeros 5 d\u00edas h\u00e1biles."}</p>
+                  Repartir entre las 5 personas (primeros 5 días hábiles)</label>
+                <p className="muted" style={{marginTop:4}}>{isFirst5BizDays()?"Hoy estás dentro de los primeros 5 días hábiles.":"Hoy NO estás en los primeros 5 días hábiles."}</p>
               </div>
               <div>
                 <label className="fld">Las 5 personas del reparto</label>
@@ -361,8 +367,8 @@ function App(){
           </div>
 
           <div className="card">
-            <h2>5 \u00b7 Clientes de Confirmaci\u00f3n de Gastos</h2>
-            <p className="muted">Sus despachos se asignan al \u201cprimer facturador\u201d. Agrega o quita sin tocar c\u00f3digo.</p>
+            <h2>5 · Clientes de Confirmación de Gastos</h2>
+            <p className="muted">Sus despachos se asignan al "primer facturador". Agrega o quita sin tocar código.</p>
             <div style={{display:"flex",gap:8,marginTop:12}}>
               <input type="text" value={newConf} placeholder="Nombre del cliente"
                 onChange={e=>setNewConf(e.target.value)}
@@ -370,28 +376,28 @@ function App(){
               <button className="btn dark" onClick={()=>{if(newConf.trim()){setConf([...conf,newConf.trim().toUpperCase()]);setNewConf("");}}}>Agregar</button>
             </div>
             <div className="chips">{conf.map((c,i)=>(
-              <span className="chip" key={c+i}>{c}<button onClick={()=>setConf(conf.filter((_,j)=>j!==i))}>\u2715</button></span>))}</div>
+              <span className="chip" key={c+i}>{c}<button onClick={()=>setConf(conf.filter((_,j)=>j!==i))}>✕</button></span>))}</div>
           </div>
 
-          <button className="btn" style={{fontSize:15,padding:"11px 22px"}} disabled={!mapOK} onClick={generar}>Generar asignaci\u00f3n \u2192</button>
+          <button className="btn" style={{fontSize:15,padding:"11px 22px"}} disabled={!mapOK} onClick={generar}>Generar asignación →</button>
           {!mapOK && <p className="muted" style={{marginTop:8}}>Completa el mapeo de despacho, cliente y estado.</p>}
         </>)}
 
-        {tab==="resultado" && (!result ? <div className="empty">Genera la asignaci\u00f3n desde <b>Ajustes</b>.</div> : <>
+        {tab==="resultado" && (!result ? <div className="empty">Genera la asignación desde <b>Ajustes</b>.</div> : <>
           <div className="grid3" style={{marginBottom:20}}>
             <div className="stat"><div className="lab">Despachos por trabajar</div><div className="val">{result.length}</div></div>
-            <div className="stat"><div className="lab">Confirmaci\u00f3n de gastos</div><div className="val" style={{color:FACT}}>{result.filter(r=>r.tipo==="conf").length}</div></div>
-            <div className="stat"><div className="lab">Modo</div><div className="val" style={{fontSize:18,paddingTop:8}}>{first5?"Reparto 5 d\u00edas":"Persona por defecto"}</div></div>
+            <div className="stat"><div className="lab">Confirmación de gastos</div><div className="val" style={{color:FACT}}>{result.filter(r=>r.tipo==="conf").length}</div></div>
+            <div className="stat"><div className="lab">Modo</div><div className="val" style={{fontSize:18,paddingTop:8}}>{first5?"Reparto 5 días":"Persona por defecto"}</div></div>
           </div>
-          {result.length===0 && <div className="note">El cruce no encontr\u00f3 coincidencias. Revisa en <b>Ajustes</b> que el N\u00b0 de despacho est\u00e9 bien mapeado en ambas planillas.</div>}
+          {result.length===0 && <div className="note">El cruce no encontró coincidencias. Revisa en <b>Ajustes</b> que el N° de despacho esté bien mapeado en ambas planillas.</div>}
           <div className="card" style={{padding:0,overflow:"hidden"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",borderBottom:"1px solid #f1f5f9"}}>
               <h2 style={{margin:0}}>Excel final</h2>
-              <button className="btn" onClick={descargar} disabled={result.length===0}>\u2b07 Descargar Excel</button>
+              <button className="btn" onClick={descargar} disabled={result.length===0}>⬇ Descargar Excel</button>
             </div>
             <div style={{overflowX:"auto",maxHeight:480,overflowY:"auto"}}>
               <table>
-                <thead><tr>{["Despacho","Cliente","Aduana","Proveedor","Designado el","Asignaci\u00f3n"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <thead><tr>{["Despacho","Cliente","Aduana","Proveedor","Designado el","Asignación"].map(h=><th key={h}>{h}</th>)}</tr></thead>
                 <tbody>{result.map((r,i)=>(
                   <tr key={i}>
                     <td style={{color:"#64748b"}}>{r.despacho}</td>
@@ -406,7 +412,7 @@ function App(){
           </div>
         </>)}
 
-        {tab==="tablero" && (!ready ? <div className="empty">Primero carga las planillas.</div> : !medicion ? <div className="empty">En <b>Ajustes</b> mapea la columna \u201cFacturador / asignado\u201d.</div> : <>
+        {tab==="tablero" && (!ready ? <div className="empty">Primero carga las planillas.</div> : !medicion ? <div className="empty">En <b>Ajustes</b> mapea la columna "Facturador / asignado".</div> : <>
           <div className="grid3" style={{marginBottom:20}}>
             <div className="stat"><div className="lab">Facturados</div><div className="val" style={{color:FACT}}>{medicion.totalFact.toLocaleString("es-CL")}</div></div>
             <div className="stat"><div className="lab">No facturados</div><div className="val" style={{color:NOFA}}>{medicion.totalNo.toLocaleString("es-CL")}</div></div>
@@ -414,10 +420,10 @@ function App(){
           </div>
           <div className="card">
             <h2>Facturados y no facturados por usuario</h2>
-            <p className="muted" style={{marginBottom:12}}>Hoja <b>{drvWB[drvSheet].name}</b> \u00b7 facturado = OK, para devoluci\u00f3n, ajuste OK, ajuste contabilidad, devoluci\u00f3n total, egreso creado desembolsos sin rendir, transferencia duplicada</p>
+            <p className="muted" style={{marginBottom:12}}>Hoja <b>{drvWB[drvSheet].name}</b> · facturado = OK, para devolución, ajuste OK, ajuste contabilidad, devolución total, egreso creado desembolsos sin rendir, transferencia duplicada</p>
             <BarUsuarios rows={medicion.rows}/>
           </div>
-          <div className="note">El historial mes a mes (tendencia) se agrega en el siguiente paso, cuando definamos d\u00f3nde guardar las mediciones. Por ahora el tablero mide la hoja del mes que elegiste.</div>
+          <div className="note">El historial mes a mes (tendencia) se agrega en el siguiente paso, cuando definamos dónde guardar las mediciones. Por ahora el tablero mide la hoja del mes que elegiste.</div>
         </>)}
 
       </div></main>
