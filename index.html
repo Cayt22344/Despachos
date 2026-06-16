@@ -36,8 +36,6 @@
     font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
   .btn:hover { background: #4338ca; }
   .btn.dark { background: #0f172a; } .btn.dark:hover { background: #1e293b; }
-  .btn.ghost { background: #f1f5f9; color: #334155; } .btn.ghost:hover { background: #e2e8f0; }
-  .btn.sm { padding: 5px 10px; font-size: 13px; }
   .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
   .filebox { border: 1.5px dashed #cbd5e1; border-radius: 10px; padding: 22px; text-align: center; cursor: pointer; }
   .filebox.ok { border-style: solid; border-color: #34d399; background: #ecfdf5; }
@@ -46,9 +44,6 @@
     font-size: 13px; padding: 4px 6px 4px 12px; border-radius: 999px; }
   .chip button { border: none; background: none; cursor: pointer; color: #64748b; display: flex; padding: 2px; border-radius: 999px; }
   .chip button:hover { background: #cbd5e1; }
-  .checks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-  .checks label { display: inline-flex; align-items: center; gap: 6px; background: #f8fafc; border: 1px solid #e2e8f0;
-    padding: 6px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8;
     font-weight: 500; padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
@@ -62,6 +57,7 @@
   .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .note { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 10px; padding: 14px; font-size: 14px; }
   .ok-note { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 10px; padding: 12px 14px; font-size: 13px; }
+  .info { background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; border-radius: 10px; padding: 12px 14px; font-size: 13px; }
   .empty { text-align: center; color: #94a3b8; padding: 40px; font-size: 14px; }
   @media (max-width: 720px){ .grid2,.grid3{ grid-template-columns: 1fr; } }
 </style>
@@ -74,9 +70,18 @@ const { useState, useEffect, useRef, useMemo } = React;
 const FACT = "#4f46e5", NOFA = "#fb7185";
 const PEOPLE_DEF = ["zbaeza","lurtubia","vanessahernandez","vretamales","jcisternas"];
 const MONTHS = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPT","OCT","NOV","DIC"];
+
+// --- Reglas de estado fijas ---
+// Pendientes por trabajar (para el cruce): "" = vacio
+const PENDIENTE = ["", "PARA REVISAR", "REVISAR BORRADOR"];
+// Facturados (para la medicion)
+const FACTURADO = ["OK","PARA DEVOLUCION","AJUSTE OK","AJUSTE CONTABILIDAD","DEVOLUCION TOTAL","EGRESO CREADO DESEMBOLSOS SIN RENDIR","TRANSFERENCIA DUPLICADA"];
+
 const CONF_DEF = ["A & C EQUIPO GASTRONOMICO","ABENGOA CHILE S.A.","AERONAUTICAL SUPPLIES SPA","AGRICOLA POBENA S.A.","AGRONUTRICION SPA","AGROGUASH SPA","AMSEC SPA","ANILINAS MONTBLAC","ASCEND LABORATORIES SPA","AUSTIN CHILE TRADING","BASCA","BRISTOL MYERS SQUIBB DE CHILE","BARNICES ANDINOS SPA","BOTANICAL SOLUTIONS SPA","COM. CARISUR LTDA","CALIDRA","CENTRAL DE REST ARAMARK","CIA.ELECTROMETALURGICA","COMERCIAL HIDROCENTRO S.A.","COMERCIAL DICALLA S.A.","COMERCIAL PROCOMEC LIMITADA","COMERCIAL RTI SPA","COMERCIAL RNK LIMITADA","COMERCIAL. LOS ROBLES","COM Y SERV SUN RENTAL CHILE","COMERCIALIZADORA CHEGO CHEGO SPA","CRUCERO S.A.","CURTIEMBRE BASKA S A","D-LAYOUT","DIMERC","DJ","DOÑA ANTONIA SOLAR","EGLO CHILE ILUMINACION LTDA","EMARESA, INGENIEROS Y REPR.","EBRO STAFSJO VALVES CHILE","EUROFARMA CHILE SPA","FABRICA DE CALZADOS GINO S.A.","FLEISCHMANN CHILE S.A.","FESANCO SPA","FRANKLIN ELEC.(CHILE) LIMITADA","GENERAL PRODUCTS CHILE S.A.","GINO","GOTT SPA","GREAT PLAINS STAINLESS S.A.","GREAT SOLUCION","GRID SOLUTIONS CHILE SA","GRUPO LATYN SA","GYM LOGISTIC","IMPORTADORA RAGU SPA","IMPORTADORA DINAR S.R. LTDA.","INV. FOTOVOLTAICAS SPA","IMP.Y COM.ALIANZA COMER. SPA","IMPALSA SPA","IMPORTADORA Y COMERCIALIZDORA TRIPANTU SPA","INGENIERIA CARO Y CARO LTDA.","ITA SPA","JACUZZI CHILE S.A","JORGUE DE CAMINO","LUVAL S.A.","MAT.Y COMP.INDUST.METACOM","MATTEL","METKA","MIXTAIL S.A.","MECHANICAL AND PIPING SOLUTIONS SPA","MIYSTAIL","TAMARICO SOLAR DOS SPA","P Y P","PLANTA SOLAR TOCOPILLA SPA","PAL LOGISTICS","PE Y PE S.A.","PENA SPOERER Y CIA S.A.","PERI CHILE ENCOFRADOS Y AND","PERNOSTOCK LTDA","POWER TRANSMISSION S SPA","PESCO RENTAL","PRINAL","RAUL TAGLE E HIJOS LTDA","ROMINA FERNANDA LOPEZ","SEMILLAS TUNICHE","SERV.DE REHA.IND.CIPP CHILE SA","SILEN","SIMMA","SMURFIT KAPPA DE CHILE S.A.","SOC. COM. LORCA Y ESTIBILL LIMITADA","SUN RENTAL","VERTIV CONO SUR LIMITADA","WONTECH","XYLEM WATER SOLUTIONS CHILE"];
 
+const stripAcc = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 const norm = s => String(s==null?"":s).trim().toUpperCase().replace(/\s+/g," ");
+const normEst = s => stripAcc(String(s==null?"":s).trim().toUpperCase()).replace(/\s+/g," ");
 const despKey = v => String(v==null?"":v).trim().replace(/\.0+$/,"");
 const today = () => { const d=new Date(); const p=n=>String(n).padStart(2,"0");
   return p(d.getDate())+"-"+p(d.getMonth()+1)+"-"+d.getFullYear(); };
@@ -90,7 +95,6 @@ function isFirst5BizDays(){
   return biz<=5;
 }
 
-// Lee TODAS las hojas como matrices (filas x columnas)
 async function readWB(file){
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, {type:"array"});
@@ -100,7 +104,6 @@ async function readWB(file){
   }));
 }
 
-// Encuentra la fila que parece ser de encabezados
 function detectHeaderRow(aoa){
   const top = Math.min(aoa.length, 20);
   for(let r=0;r<top;r++){
@@ -115,7 +118,6 @@ function detectHeaderRow(aoa){
   return best;
 }
 
-// A partir de una hoja + fila de encabezado, arma {headers, rows}
 function buildTable(aoa, hr){
   const rawH = aoa[hr]||[];
   const headers = rawH.map((h,i)=>{ const t=String(h).replace(/\s+/g," ").trim(); return t || ("Columna "+(i+1)); });
@@ -180,7 +182,6 @@ function App(){
   const [sigSheet,setSigSheet]=useState(0); const [sigHR,setSigHR]=useState(0);
   const [drvSheet,setDrvSheet]=useState(0); const [drvHR,setDrvHR]=useState(0);
   const [m,setM]=useState({sigDesp:"",sigCli:"",sigAdu:"",sigProv:"",drvDesp:"",drvEst:"",drvFact:""});
-  const [pend,setPend]=useState([]); const [factSt,setFactSt]=useState([]);
   const [defPerson,setDefPerson]=useState("zbaeza");
   const [people,setPeople]=useState(PEOPLE_DEF);
   const [conf,setConf]=useState(CONF_DEF); const [newConf,setNewConf]=useState("");
@@ -189,7 +190,6 @@ function App(){
 
   const ready = sigWB && drvWB;
 
-  // Construye las tablas según hoja + fila de encabezado elegidas
   const sig = useMemo(()=> sigWB ? buildTable(sigWB[sigSheet].aoa, sigHR) : null, [sigWB,sigSheet,sigHR]);
   const drv = useMemo(()=> drvWB ? buildTable(drvWB[drvSheet].aoa, drvHR) : null, [drvWB,drvSheet,drvHR]);
 
@@ -211,52 +211,26 @@ function App(){
     setM(p=>({...p, drvDesp:guessIdx(headers,["despach"]), drvEst:guessIdx(headers,["estad"]),
       drvFact:guessIdx(headers,["asign","factur"]) }));
   }
-
-  // Re-detecta encabezado/mapeo al cambiar de hoja en Drive
   function changeDrvSheet(i){
     i=Number(i); setDrvSheet(i);
     const hr=detectHeaderRow(drvWB[i].aoa); setDrvHR(hr);
     const {headers}=buildTable(drvWB[i].aoa,hr);
     setM(p=>({...p, drvDesp:guessIdx(headers,["despach"]), drvEst:guessIdx(headers,["estad"]),
       drvFact:guessIdx(headers,["asign","factur"]) }));
-    setPend([]); setFactSt([]);
   }
 
-  const estadosDistintos = useMemo(()=>{
-    if(!drv || m.drvEst==="") return [];
-    const idx=Number(m.drvEst);
-    const set=new Set(drv.rows.map(r=>norm(r[idx])).filter(Boolean));
-    return [...set].sort();
-  },[drv,m.drvEst]);
-
-  function sugerirEstados(){
-    setPend(estadosDistintos.filter(e=>e===""||e.includes("REVISAR")||e.includes("VACI")||e.includes("BORRADOR")).concat(
-      estadosDistintos.includes("")?[]:[]));
-    setFactSt(estadosDistintos.filter(e=>e.includes("OK")));
-  }
-  useEffect(()=>{
-    if(estadosDistintos.length){
-      if(pend.length===0) setPend(estadosDistintos.filter(e=>e===""||e.includes("REVISAR")||e.includes("VACI")||e.includes("BORRADOR")));
-      if(factSt.length===0) setFactSt(estadosDistintos.filter(e=>e.includes("OK")));
-    }
-  },[estadosDistintos]);
-
-  const toggle=(arr,set,v)=> set(arr.includes(v)?arr.filter(x=>x!==v):[...arr,v]);
   const isConf=cli=>{ const c=norm(cli); return conf.some(x=>{const n=norm(x); return n && (c===n||c.includes(n));}); };
 
   function generar(){
     const sD=Number(m.sigDesp), sC=Number(m.sigCli), sA=m.sigAdu===""?-1:Number(m.sigAdu), sP=m.sigProv===""?-1:Number(m.sigProv);
     const dD=Number(m.drvDesp), dE=Number(m.drvEst);
-    // SIGAD: quitar despachos duplicados
     const vistos=new Set(); const sigClean=[];
     for(const r of sig.rows){ const k=despKey(r[sD]); if(!k||vistos.has(k)) continue; vistos.add(k);
       sigClean.push({despacho:r[sD], cliente:r[sC], aduana:sA<0?"":r[sA], proveedor:sP<0?"":r[sP], _k:k}); }
-    // Drive: set de despachos en estados pendientes
+    // Filtro Drive: pendientes por trabajar (regla fija)
     const pendSet=new Set();
-    for(const r of drv.rows){ if(pend.includes(norm(r[dE]))) pendSet.add(despKey(r[dD])); }
-    // Cruce
+    for(const r of drv.rows){ if(PENDIENTE.includes(normEst(r[dE]))) pendSet.add(despKey(r[dD])); }
     const cruzados=sigClean.filter(r=>pendSet.has(r._k));
-    // Asignar
     let rr=0; const f=today();
     const out=cruzados.map(r=>{
       let asign, tipo="ok";
@@ -276,17 +250,18 @@ function App(){
     XLSX.writeFile(wb,"despachos_asignados_"+today()+".xlsx");
   }
 
+  // Medicion: facturado = estado en FACTURADO (regla fija); el resto = no facturado
   const medicion = useMemo(()=>{
-    if(!drv || m.drvFact===""||m.drvEst===""||factSt.length===0) return null;
+    if(!drv || m.drvFact===""||m.drvEst==="") return null;
     const dF=Number(m.drvFact), dE=Number(m.drvEst); const map={};
     for(const r of drv.rows){ const u=String(r[dF]||"").trim(); if(!u) continue;
-      const est=norm(r[dE]); if(!map[u]) map[u]={usuario:u,fact:0,no:0};
-      if(factSt.includes(est)) map[u].fact++; else map[u].no++; }
+      if(!map[u]) map[u]={usuario:u,fact:0,no:0};
+      if(FACTURADO.includes(normEst(r[dE]))) map[u].fact++; else map[u].no++; }
     const rows=Object.values(map).sort((a,b)=>(b.fact+b.no)-(a.fact+a.no)).slice(0,12);
     return { rows, totalFact:rows.reduce((s,r)=>s+r.fact,0), totalNo:rows.reduce((s,r)=>s+r.no,0) };
-  },[drv,m.drvFact,m.drvEst,factSt]);
+  },[drv,m.drvFact,m.drvEst]);
 
-  const mapOK = m.sigDesp!==""&&m.sigCli!==""&&m.drvDesp!==""&&m.drvEst!==""&&pend.length>0;
+  const mapOK = m.sigDesp!==""&&m.sigCli!==""&&m.drvDesp!==""&&m.drvEst!=="";
 
   return (
     <div>
@@ -313,7 +288,7 @@ function App(){
             </div>
           </div>
           {ready && <div className="card">
-            <div className="ok-note">Detect\u00e9 autom\u00e1ticamente: SIGAD \u2192 hoja <b>{sigWB[sigSheet].name}</b>, encabezados en fila <b>{sigHR+1}</b>. Drive \u2192 hoja <b>{drvWB[drvSheet].name}</b>, encabezados en fila <b>{drvHR+1}</b>. Si algo no calza, lo ajustas en <b>Ajustes</b>.</div>
+            <div className="ok-note">Detect\u00e9: SIGAD \u2192 hoja <b>{sigWB[sigSheet].name}</b>, encabezados en fila <b>{sigHR+1}</b>. Drive \u2192 hoja <b>{drvWB[drvSheet].name}</b>, encabezados en fila <b>{drvHR+1}</b>. Si algo no calza, lo ajustas en <b>Ajustes</b>.</div>
             <button className="btn" style={{marginTop:14}} onClick={()=>setTab("ajustes")}>Ir a Ajustes \u2192</button>
           </div>}
         </>)}
@@ -359,23 +334,15 @@ function App(){
                 <MapSelect label="Facturador / asignado" optional value={m.drvFact} headers={drv.headers} onChange={v=>setM({...m,drvFact:v})}/>
               </div>
             </div>
+            <div className="info" style={{marginTop:16}}>
+              <b>Reglas de estado (autom\u00e1ticas):</b><br/>
+              Para el cruce, son <b>pendientes por trabajar</b>: vac\u00edo, para revisar, revisar borrador.<br/>
+              Para la medici\u00f3n, cuentan como <b>facturados</b>: OK, para devoluci\u00f3n, ajuste OK, ajuste contabilidad, devoluci\u00f3n total, egreso creado desembolsos sin rendir, transferencia duplicada. El resto es no facturado.
+            </div>
           </div>
 
-          {estadosDistintos.length>0 && <div className="card">
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <h2>4 \u00b7 Estados</h2>
-              <button className="btn ghost sm" onClick={sugerirEstados}>Sugerir</button>
-            </div>
-            <label className="fld">Pendientes por trabajar (se cruza con estos)</label>
-            <div className="checks">{estadosDistintos.map(e=>(
-              <label key={e}><input type="checkbox" checked={pend.includes(e)} onChange={()=>toggle(pend,setPend,e)}/>{e||"(vac\u00edo)"}</label>))}</div>
-            <label className="fld" style={{marginTop:16}}>Cuentan como \u201cfacturado\u201d (para el tablero)</label>
-            <div className="checks">{estadosDistintos.map(e=>(
-              <label key={e}><input type="checkbox" checked={factSt.includes(e)} onChange={()=>toggle(factSt,setFactSt,e)}/>{e||"(vac\u00edo)"}</label>))}</div>
-          </div>}
-
           <div className="card">
-            <h2>5 \u00b7 Reglas de asignaci\u00f3n</h2>
+            <h2>4 \u00b7 Reglas de asignaci\u00f3n</h2>
             <div className="grid2">
               <div>
                 <label className="fld">Persona por defecto (recibe casi todo)</label>
@@ -394,7 +361,7 @@ function App(){
           </div>
 
           <div className="card">
-            <h2>6 \u00b7 Clientes de Confirmaci\u00f3n de Gastos</h2>
+            <h2>5 \u00b7 Clientes de Confirmaci\u00f3n de Gastos</h2>
             <p className="muted">Sus despachos se asignan al \u201cprimer facturador\u201d. Agrega o quita sin tocar c\u00f3digo.</p>
             <div style={{display:"flex",gap:8,marginTop:12}}>
               <input type="text" value={newConf} placeholder="Nombre del cliente"
@@ -407,7 +374,7 @@ function App(){
           </div>
 
           <button className="btn" style={{fontSize:15,padding:"11px 22px"}} disabled={!mapOK} onClick={generar}>Generar asignaci\u00f3n \u2192</button>
-          {!mapOK && <p className="muted" style={{marginTop:8}}>Completa despacho/cliente/estado y marca al menos un estado pendiente.</p>}
+          {!mapOK && <p className="muted" style={{marginTop:8}}>Completa el mapeo de despacho, cliente y estado.</p>}
         </>)}
 
         {tab==="resultado" && (!result ? <div className="empty">Genera la asignaci\u00f3n desde <b>Ajustes</b>.</div> : <>
@@ -416,7 +383,7 @@ function App(){
             <div className="stat"><div className="lab">Confirmaci\u00f3n de gastos</div><div className="val" style={{color:FACT}}>{result.filter(r=>r.tipo==="conf").length}</div></div>
             <div className="stat"><div className="lab">Modo</div><div className="val" style={{fontSize:18,paddingTop:8}}>{first5?"Reparto 5 d\u00edas":"Persona por defecto"}</div></div>
           </div>
-          {result.length===0 && <div className="note">El cruce no encontr\u00f3 coincidencias. Revisa en <b>Ajustes</b> que el N\u00b0 de despacho est\u00e9 bien mapeado en ambas planillas y que los estados pendientes sean los correctos.</div>}
+          {result.length===0 && <div className="note">El cruce no encontr\u00f3 coincidencias. Revisa en <b>Ajustes</b> que el N\u00b0 de despacho est\u00e9 bien mapeado en ambas planillas.</div>}
           <div className="card" style={{padding:0,overflow:"hidden"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",borderBottom:"1px solid #f1f5f9"}}>
               <h2 style={{margin:0}}>Excel final</h2>
@@ -439,7 +406,7 @@ function App(){
           </div>
         </>)}
 
-        {tab==="tablero" && (!ready ? <div className="empty">Primero carga las planillas.</div> : !medicion ? <div className="empty">En <b>Ajustes</b> mapea \u201cFacturador / asignado\u201d y marca qu\u00e9 estados son \u201cfacturado\u201d.</div> : <>
+        {tab==="tablero" && (!ready ? <div className="empty">Primero carga las planillas.</div> : !medicion ? <div className="empty">En <b>Ajustes</b> mapea la columna \u201cFacturador / asignado\u201d.</div> : <>
           <div className="grid3" style={{marginBottom:20}}>
             <div className="stat"><div className="lab">Facturados</div><div className="val" style={{color:FACT}}>{medicion.totalFact.toLocaleString("es-CL")}</div></div>
             <div className="stat"><div className="lab">No facturados</div><div className="val" style={{color:NOFA}}>{medicion.totalNo.toLocaleString("es-CL")}</div></div>
@@ -447,7 +414,7 @@ function App(){
           </div>
           <div className="card">
             <h2>Facturados y no facturados por usuario</h2>
-            <p className="muted" style={{marginBottom:12}}>Hoja <b>{drvWB[drvSheet].name}</b> \u00b7 calculado desde la planilla de Drive</p>
+            <p className="muted" style={{marginBottom:12}}>Hoja <b>{drvWB[drvSheet].name}</b> \u00b7 facturado = OK, para devoluci\u00f3n, ajuste OK, ajuste contabilidad, devoluci\u00f3n total, egreso creado desembolsos sin rendir, transferencia duplicada</p>
             <BarUsuarios rows={medicion.rows}/>
           </div>
           <div className="note">El historial mes a mes (tendencia) se agrega en el siguiente paso, cuando definamos d\u00f3nde guardar las mediciones. Por ahora el tablero mide la hoja del mes que elegiste.</div>
