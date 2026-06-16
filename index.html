@@ -71,9 +71,7 @@ const FACT = "#4f46e5", NOFA = "#fb7185";
 const PEOPLE_DEF = ["zbaeza","lurtubia","vanessahernandez","vretamales","jcisternas"];
 const MONTHS = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPT","OCT","NOV","DIC"];
 
-// Reglas de estado fijas. Pendientes para el cruce ("" = vacio):
-const PENDIENTE = ["", "PARA REVISAR", "REVISAR BORRADOR"];
-// Facturados para la medicion:
+// Estados que cuentan como facturado para la medicion:
 const FACTURADO = ["OK","PARA DEVOLUCION","AJUSTE OK","AJUSTE CONTABILIDAD","DEVOLUCION TOTAL","EGRESO CREADO DESEMBOLSOS SIN RENDIR","TRANSFERENCIA DUPLICADA"];
 
 const CONF_DEF = ["A & C EQUIPO GASTRONOMICO","ABENGOA CHILE S.A.","AERONAUTICAL SUPPLIES SPA","AGRICOLA POBENA S.A.","AGRONUTRICION SPA","AGROGUASH SPA","AMSEC SPA","ANILINAS MONTBLAC","ASCEND LABORATORIES SPA","AUSTIN CHILE TRADING","BASCA","BRISTOL MYERS SQUIBB DE CHILE","BARNICES ANDINOS SPA","BOTANICAL SOLUTIONS SPA","COM. CARISUR LTDA","CALIDRA","CENTRAL DE REST ARAMARK","CIA.ELECTROMETALURGICA","COMERCIAL HIDROCENTRO S.A.","COMERCIAL DICALLA S.A.","COMERCIAL PROCOMEC LIMITADA","COMERCIAL RTI SPA","COMERCIAL RNK LIMITADA","COMERCIAL. LOS ROBLES","COM Y SERV SUN RENTAL CHILE","COMERCIALIZADORA CHEGO CHEGO SPA","CRUCERO S.A.","CURTIEMBRE BASKA S A","D-LAYOUT","DIMERC","DJ","DOÑA ANTONIA SOLAR","EGLO CHILE ILUMINACION LTDA","EMARESA, INGENIEROS Y REPR.","EBRO STAFSJO VALVES CHILE","EUROFARMA CHILE SPA","FABRICA DE CALZADOS GINO S.A.","FLEISCHMANN CHILE S.A.","FESANCO SPA","FRANKLIN ELEC.(CHILE) LIMITADA","GENERAL PRODUCTS CHILE S.A.","GINO","GOTT SPA","GREAT PLAINS STAINLESS S.A.","GREAT SOLUCION","GRID SOLUTIONS CHILE SA","GRUPO LATYN SA","GYM LOGISTIC","IMPORTADORA RAGU SPA","IMPORTADORA DINAR S.R. LTDA.","INV. FOTOVOLTAICAS SPA","IMP.Y COM.ALIANZA COMER. SPA","IMPALSA SPA","IMPORTADORA Y COMERCIALIZDORA TRIPANTU SPA","INGENIERIA CARO Y CARO LTDA.","ITA SPA","JACUZZI CHILE S.A","JORGUE DE CAMINO","LUVAL S.A.","MAT.Y COMP.INDUST.METACOM","MATTEL","METKA","MIXTAIL S.A.","MECHANICAL AND PIPING SOLUTIONS SPA","MIYSTAIL","TAMARICO SOLAR DOS SPA","P Y P","PLANTA SOLAR TOCOPILLA SPA","PAL LOGISTICS","PE Y PE S.A.","PENA SPOERER Y CIA S.A.","PERI CHILE ENCOFRADOS Y AND","PERNOSTOCK LTDA","POWER TRANSMISSION S SPA","PESCO RENTAL","PRINAL","RAUL TAGLE E HIJOS LTDA","ROMINA FERNANDA LOPEZ","SEMILLAS TUNICHE","SERV.DE REHA.IND.CIPP CHILE SA","SILEN","SIMMA","SMURFIT KAPPA DE CHILE S.A.","SOC. COM. LORCA Y ESTIBILL LIMITADA","SUN RENTAL","VERTIV CONO SUR LIMITADA","WONTECH","XYLEM WATER SOLUTIONS CHILE"];
@@ -82,6 +80,7 @@ const stripAcc = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 const norm = s => String(s==null?"":s).trim().toUpperCase().replace(/\s+/g," ");
 const normEst = s => stripAcc(String(s==null?"":s).trim().toUpperCase()).replace(/\s+/g," ");
 const despKey = v => String(v==null?"":v).trim().replace(/\.0+$/,"");
+const pairKey = (d,p) => despKey(d) + "||" + norm(p);
 const today = () => { const d=new Date(); const p=n=>String(n).padStart(2,"0");
   return p(d.getDate())+"-"+p(d.getMonth()+1)+"-"+d.getFullYear(); };
 
@@ -124,7 +123,6 @@ function buildTable(aoa, hr){
   return { headers, rows };
 }
 
-// Adivina el indice de columna: prioriza coincidencia exacta, luego que empiece, luego que contenga
 function guessIdx(headers, keys){
   const low = headers.map(h=>h.toLowerCase().trim());
   for(const k of keys){ const i=low.indexOf(k); if(i>=0) return String(i); }
@@ -183,7 +181,7 @@ function App(){
   const [drvWB,setDrvWB]=useState(null); const [drvName,setDrvName]=useState("");
   const [sigSheet,setSigSheet]=useState(0); const [sigHR,setSigHR]=useState(0);
   const [drvSheet,setDrvSheet]=useState(0); const [drvHR,setDrvHR]=useState(0);
-  const [m,setM]=useState({sigDesp:"",sigCli:"",sigAdu:"",sigProv:"",drvDesp:"",drvEst:"",drvFact:""});
+  const [m,setM]=useState({sigDesp:"",sigCli:"",sigAdu:"",sigProv:"",drvDesp:"",drvProv:"",drvEst:"",drvFact:""});
   const [defPerson,setDefPerson]=useState("zbaeza");
   const [people,setPeople]=useState(PEOPLE_DEF);
   const [conf,setConf]=useState(CONF_DEF); const [newConf,setNewConf]=useState("");
@@ -200,8 +198,8 @@ function App(){
       sigAdu:guessIdx(headers,["aduana"]), sigProv:guessIdx(headers,["prestador del servicio","prestador","proveedor"]) };
   }
   function mapDrv(headers){
-    return { drvDesp:guessIdx(headers,["despacho","despach"]), drvEst:guessIdx(headers,["estado","estad"]),
-      drvFact:guessIdx(headers,["asignacion","asignado","facturador","factur"]) };
+    return { drvDesp:guessIdx(headers,["despacho","despach"]), drvProv:guessIdx(headers,["proveedor","provee","prestador"]),
+      drvEst:guessIdx(headers,["estado","estad"]), drvFact:guessIdx(headers,["asignacion","asignado","facturador","factur"]) };
   }
 
   function loadSig(wb,name){
@@ -230,22 +228,33 @@ function App(){
   const isConf=cli=>{ const c=norm(cli); return conf.some(x=>{const n=norm(x); return n && (c===n||c.includes(n));}); };
 
   function generar(){
-    const sD=Number(m.sigDesp), sC=Number(m.sigCli), sA=m.sigAdu===""?-1:Number(m.sigAdu), sP=m.sigProv===""?-1:Number(m.sigProv);
-    const dD=Number(m.drvDesp), dE=Number(m.drvEst);
-    const vistos=new Set(); const sigClean=[];
-    for(const r of sig.rows){ const k=despKey(r[sD]); if(!k||vistos.has(k)) continue; vistos.add(k);
-      sigClean.push({despacho:r[sD], cliente:r[sC], aduana:sA<0?"":r[sA], proveedor:sP<0?"":r[sP], _k:k}); }
-    const pendSet=new Set();
-    for(const r of drv.rows){ if(PENDIENTE.includes(normEst(r[dE]))) pendSet.add(despKey(r[dD])); }
-    const cruzados=sigClean.filter(r=>pendSet.has(r._k));
-    let rr=0; const f=today();
-    const out=cruzados.map(r=>{
-      let asign, tipo="ok";
-      if(isConf(r.cliente)){ asign="Primer facturador (pendiente)"; tipo="conf"; }
+    const sD=Number(m.sigDesp), sC=Number(m.sigCli), sA=m.sigAdu===""?-1:Number(m.sigAdu), sP=Number(m.sigProv);
+    const dD=Number(m.drvDesp), dP=Number(m.drvProv);
+    // Drive: conjunto de (despacho + proveedor) de TODAS las hojas de meses
+    const drvSet=new Set();
+    drvWB.forEach(sheet=>{
+      if(sheet.name.toUpperCase().includes("MEDICION")) return;
+      const hr=detectHeaderRow(sheet.aoa);
+      for(let i=hr+1;i<sheet.aoa.length;i++){
+        const row=sheet.aoa[i]; if(!row) continue;
+        const d=despKey(row[dD]); if(!d) continue;
+        drvSet.add(pairKey(row[dD], row[dP]));
+      }
+    });
+    // SIGAD: quitar repetidos (despacho+proveedor) y dejar solo los que NO estan en Drive
+    const vistos=new Set(); let rr=0; const f=today(); const out=[];
+    for(const r of sig.rows){
+      const d=despKey(r[sD]); if(!d) continue;
+      const key=pairKey(r[sD], r[sP]);
+      if(vistos.has(key)) continue; vistos.add(key);
+      if(drvSet.has(key)) continue; // ya esta en Drive con ese proveedor
+      const cli=r[sC];
+      let asign,tipo="ok";
+      if(isConf(cli)){ asign="Primer facturador (pendiente)"; tipo="conf"; }
       else if(first5){ asign=people[rr%people.length]; rr++; }
       else asign=defPerson;
-      return {...r, designado:f, asignacion:asign, tipo};
-    });
+      out.push({despacho:r[sD], cliente:cli, aduana:sA<0?"":r[sA], proveedor:r[sP], designado:f, asignacion:asign, tipo});
+    }
     setResult(out); setTab("resultado");
   }
 
@@ -267,7 +276,7 @@ function App(){
     return { rows, totalFact:rows.reduce((s,r)=>s+r.fact,0), totalNo:rows.reduce((s,r)=>s+r.no,0) };
   },[drv,m.drvFact,m.drvEst]);
 
-  const mapOK = m.sigDesp!==""&&m.sigCli!==""&&m.drvDesp!==""&&m.drvEst!=="";
+  const mapOK = m.sigDesp!==""&&m.sigCli!==""&&m.sigProv!==""&&m.drvDesp!==""&&m.drvProv!=="";
 
   return (
     <div>
@@ -302,7 +311,7 @@ function App(){
         {tab==="ajustes" && (!ready ? <div className="empty">Primero carga las dos planillas en <b>Cargar</b>.</div> : <>
           <div className="card">
             <h2>2 · Hoja y fila de encabezados</h2>
-            <p className="muted">Ya las detecté; corrígelas solo si hace falta.</p>
+            <p className="muted">Ya las detecté; corrígelas solo si hace falta. (La hoja de Drive de aquí abajo se usa para el Tablero; el cruce compara contra todas las hojas.)</p>
             <div className="grid2">
               <div>
                 <div style={{fontWeight:600,fontSize:13,marginTop:12,color:"#475569"}}>SIGAD</div>
@@ -313,7 +322,7 @@ function App(){
                 <input type="number" min="1" value={sigHR+1} onChange={e=>{const hr=Math.max(0,Number(e.target.value)-1);setSigHR(hr);const {headers}=buildTable(sigWB[sigSheet].aoa,hr);setM(p=>({...p,...mapSig(headers)}));}}/>
               </div>
               <div>
-                <div style={{fontWeight:600,fontSize:13,marginTop:12,color:"#475569"}}>Drive</div>
+                <div style={{fontWeight:600,fontSize:13,marginTop:12,color:"#475569"}}>Drive (mes para el Tablero)</div>
                 <label className="fld">Hoja (mes)</label>
                 <select value={drvSheet} onChange={e=>changeDrvSheet(e.target.value)}>
                   {drvWB.map((s,i)=><option key={i} value={i}>{s.name}</option>)}</select>
@@ -330,20 +339,20 @@ function App(){
                 <div style={{fontWeight:600,fontSize:13,marginTop:8,color:"#475569"}}>Planilla SIGAD</div>
                 <MapSelect label="N° de despacho" value={m.sigDesp} headers={sig.headers} onChange={v=>setM({...m,sigDesp:v})}/>
                 <MapSelect label="Cliente" value={m.sigCli} headers={sig.headers} onChange={v=>setM({...m,sigCli:v})}/>
+                <MapSelect label="Prestador / proveedor" value={m.sigProv} headers={sig.headers} onChange={v=>setM({...m,sigProv:v})}/>
                 <MapSelect label="Aduana" optional value={m.sigAdu} headers={sig.headers} onChange={v=>setM({...m,sigAdu:v})}/>
-                <MapSelect label="Prestador / proveedor" optional value={m.sigProv} headers={sig.headers} onChange={v=>setM({...m,sigProv:v})}/>
               </div>
               <div>
                 <div style={{fontWeight:600,fontSize:13,marginTop:8,color:"#475569"}}>Planilla Drive</div>
                 <MapSelect label="N° de despacho" value={m.drvDesp} headers={drv.headers} onChange={v=>setM({...m,drvDesp:v})}/>
-                <MapSelect label="Estado" value={m.drvEst} headers={drv.headers} onChange={v=>setM({...m,drvEst:v})}/>
-                <MapSelect label="Facturador / asignado" optional value={m.drvFact} headers={drv.headers} onChange={v=>setM({...m,drvFact:v})}/>
+                <MapSelect label="Proveedor" value={m.drvProv} headers={drv.headers} onChange={v=>setM({...m,drvProv:v})}/>
+                <MapSelect label="Estado (para el Tablero)" optional value={m.drvEst} headers={drv.headers} onChange={v=>setM({...m,drvEst:v})}/>
+                <MapSelect label="Facturador / asignado (Tablero)" optional value={m.drvFact} headers={drv.headers} onChange={v=>setM({...m,drvFact:v})}/>
               </div>
             </div>
             <div className="info" style={{marginTop:16}}>
-              <b>Reglas de estado (automáticas):</b><br/>
-              Para el cruce, son <b>pendientes por trabajar</b>: vacío, para revisar, revisar borrador.<br/>
-              Para la medición, cuentan como <b>facturados</b>: OK, para devolución, ajuste OK, ajuste contabilidad, devolución total, egreso creado desembolsos sin rendir, transferencia duplicada. El resto es no facturado.
+              <b>Cómo funciona el cruce:</b> muestra los despachos de SIGAD que <b>no</b> están en Drive, comparando por <b>número de despacho + proveedor</b>. Si el mismo despacho aparece con un proveedor distinto, se muestra (es trabajo nuevo). Se compara contra todas las hojas de meses de Drive.<br/><br/>
+              <b>Medición (Tablero):</b> cuentan como facturados: OK, para devolución, ajuste OK, ajuste contabilidad, devolución total, egreso creado desembolsos sin rendir, transferencia duplicada. El resto es no facturado.
             </div>
           </div>
 
@@ -380,7 +389,7 @@ function App(){
           </div>
 
           <button className="btn" style={{fontSize:15,padding:"11px 22px"}} disabled={!mapOK} onClick={generar}>Generar asignación →</button>
-          {!mapOK && <p className="muted" style={{marginTop:8}}>Completa el mapeo de despacho, cliente y estado.</p>}
+          {!mapOK && <p className="muted" style={{marginTop:8}}>Completa el mapeo de despacho, cliente y proveedor en ambas planillas.</p>}
         </>)}
 
         {tab==="resultado" && (!result ? <div className="empty">Genera la asignación desde <b>Ajustes</b>.</div> : <>
@@ -389,7 +398,7 @@ function App(){
             <div className="stat"><div className="lab">Confirmación de gastos</div><div className="val" style={{color:FACT}}>{result.filter(r=>r.tipo==="conf").length}</div></div>
             <div className="stat"><div className="lab">Modo</div><div className="val" style={{fontSize:18,paddingTop:8}}>{first5?"Reparto 5 días":"Persona por defecto"}</div></div>
           </div>
-          {result.length===0 && <div className="note">El cruce no encontró coincidencias. Revisa en <b>Ajustes</b> que el N° de despacho esté bien mapeado en ambas planillas.</div>}
+          {result.length===0 && <div className="note">No quedaron despachos. Revisa en <b>Ajustes</b> que despacho y proveedor estén bien mapeados en ambas planillas.</div>}
           <div className="card" style={{padding:0,overflow:"hidden"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",borderBottom:"1px solid #f1f5f9"}}>
               <h2 style={{margin:0}}>Excel final</h2>
@@ -412,7 +421,7 @@ function App(){
           </div>
         </>)}
 
-        {tab==="tablero" && (!ready ? <div className="empty">Primero carga las planillas.</div> : !medicion ? <div className="empty">En <b>Ajustes</b> mapea la columna "Facturador / asignado".</div> : <>
+        {tab==="tablero" && (!ready ? <div className="empty">Primero carga las planillas.</div> : !medicion ? <div className="empty">En <b>Ajustes</b> mapea "Estado" y "Facturador / asignado".</div> : <>
           <div className="grid3" style={{marginBottom:20}}>
             <div className="stat"><div className="lab">Facturados</div><div className="val" style={{color:FACT}}>{medicion.totalFact.toLocaleString("es-CL")}</div></div>
             <div className="stat"><div className="lab">No facturados</div><div className="val" style={{color:NOFA}}>{medicion.totalNo.toLocaleString("es-CL")}</div></div>
