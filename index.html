@@ -73,6 +73,8 @@ const MONTHS = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO
 
 // Estados que cuentan como facturado para la medicion:
 const FACTURADO = ["OK","PARA DEVOLUCION","AJUSTE OK","AJUSTE CONTABILIDAD","DEVOLUCION TOTAL","EGRESO CREADO DESEMBOLSOS SIN RENDIR","TRANSFERENCIA DUPLICADA"];
+// Estados en Drive que excluyen el despacho del resultado del cruce ("" = vacio):
+const EXCLUIR_CRUCE = ["", "PARA REVISAR", "TRASPASO MES SIGUIENTE"];
 
 const CONF_DEF = ["A & C EQUIPO GASTRONOMICO","ABENGOA CHILE S.A.","AERONAUTICAL SUPPLIES SPA","AGRICOLA POBENA S.A.","AGRONUTRICION SPA","AGROGUASH SPA","AMSEC SPA","ANILINAS MONTBLAC","ASCEND LABORATORIES SPA","AUSTIN CHILE TRADING","BASCA","BRISTOL MYERS SQUIBB DE CHILE","BARNICES ANDINOS SPA","BOTANICAL SOLUTIONS SPA","COM. CARISUR LTDA","CALIDRA","CENTRAL DE REST ARAMARK","CIA.ELECTROMETALURGICA","COMERCIAL HIDROCENTRO S.A.","COMERCIAL DICALLA S.A.","COMERCIAL PROCOMEC LIMITADA","COMERCIAL RTI SPA","COMERCIAL RNK LIMITADA","COMERCIAL. LOS ROBLES","COM Y SERV SUN RENTAL CHILE","COMERCIALIZADORA CHEGO CHEGO SPA","CRUCERO S.A.","CURTIEMBRE BASKA S A","D-LAYOUT","DIMERC","DJ","DOÑA ANTONIA SOLAR","EGLO CHILE ILUMINACION LTDA","EMARESA, INGENIEROS Y REPR.","EBRO STAFSJO VALVES CHILE","EUROFARMA CHILE SPA","FABRICA DE CALZADOS GINO S.A.","FLEISCHMANN CHILE S.A.","FESANCO SPA","FRANKLIN ELEC.(CHILE) LIMITADA","GENERAL PRODUCTS CHILE S.A.","GINO","GOTT SPA","GREAT PLAINS STAINLESS S.A.","GREAT SOLUCION","GRID SOLUTIONS CHILE SA","GRUPO LATYN SA","GYM LOGISTIC","IMPORTADORA RAGU SPA","IMPORTADORA DINAR S.R. LTDA.","INV. FOTOVOLTAICAS SPA","IMP.Y COM.ALIANZA COMER. SPA","IMPALSA SPA","IMPORTADORA Y COMERCIALIZDORA TRIPANTU SPA","INGENIERIA CARO Y CARO LTDA.","ITA SPA","JACUZZI CHILE S.A","JORGUE DE CAMINO","LUVAL S.A.","MAT.Y COMP.INDUST.METACOM","MATTEL","METKA","MIXTAIL S.A.","MECHANICAL AND PIPING SOLUTIONS SPA","MIYSTAIL","TAMARICO SOLAR DOS SPA","P Y P","PLANTA SOLAR TOCOPILLA SPA","PAL LOGISTICS","PE Y PE S.A.","PENA SPOERER Y CIA S.A.","PERI CHILE ENCOFRADOS Y AND","PERNOSTOCK LTDA","POWER TRANSMISSION S SPA","PESCO RENTAL","PRINAL","RAUL TAGLE E HIJOS LTDA","ROMINA FERNANDA LOPEZ","SEMILLAS TUNICHE","SERV.DE REHA.IND.CIPP CHILE SA","SILEN","SIMMA","SMURFIT KAPPA DE CHILE S.A.","SOC. COM. LORCA Y ESTIBILL LIMITADA","SUN RENTAL","VERTIV CONO SUR LIMITADA","WONTECH","XYLEM WATER SOLUTIONS CHILE"];
 
@@ -229,25 +231,27 @@ function App(){
 
   function generar(){
     const sD=Number(m.sigDesp), sC=Number(m.sigCli), sA=m.sigAdu===""?-1:Number(m.sigAdu), sP=Number(m.sigProv);
-    const dD=Number(m.drvDesp), dP=Number(m.drvProv);
-    // Drive: conjunto de (despacho + proveedor) de TODAS las hojas de meses
-    const drvSet=new Set();
+    const dD=Number(m.drvDesp), dP=Number(m.drvProv), dE=Number(m.drvEst);
+    // Drive (todas las hojas de meses): pares despacho+proveedor, y despachos con estado a excluir
+    const drvPair=new Set(); const drvEstadoExcl=new Set();
     drvWB.forEach(sheet=>{
       if(sheet.name.toUpperCase().includes("MEDICION")) return;
       const hr=detectHeaderRow(sheet.aoa);
       for(let i=hr+1;i<sheet.aoa.length;i++){
         const row=sheet.aoa[i]; if(!row) continue;
         const d=despKey(row[dD]); if(!d) continue;
-        drvSet.add(pairKey(row[dD], row[dP]));
+        drvPair.add(pairKey(row[dD], row[dP]));
+        if(EXCLUIR_CRUCE.includes(normEst(row[dE]))) drvEstadoExcl.add(d);
       }
     });
-    // SIGAD: quitar repetidos (despacho+proveedor) y dejar solo los que NO estan en Drive
-    const vistos=new Set(); let rr=0; const f=today(); const out=[];
+    // SIGAD: una sola fila por despacho, dejando solo los que NO estan en Drive
+    const seenDesp=new Set(); let rr=0; const f=today(); const out=[];
     for(const r of sig.rows){
       const d=despKey(r[sD]); if(!d) continue;
-      const key=pairKey(r[sD], r[sP]);
-      if(vistos.has(key)) continue; vistos.add(key);
-      if(drvSet.has(key)) continue; // ya esta en Drive con ese proveedor
+      if(drvPair.has(pairKey(r[sD], r[sP]))) continue;   // ya esta en Drive con ese proveedor
+      if(drvEstadoExcl.has(d)) continue;                 // en Drive con estado vacio/para revisar/traspaso
+      if(seenDesp.has(d)) continue;                      // una sola fila por numero de despacho
+      seenDesp.add(d);
       const cli=r[sC];
       let asign,tipo="ok";
       if(isConf(cli)){ asign="Primer facturador (pendiente)"; tipo="conf"; }
@@ -276,7 +280,7 @@ function App(){
     return { rows, totalFact:rows.reduce((s,r)=>s+r.fact,0), totalNo:rows.reduce((s,r)=>s+r.no,0) };
   },[drv,m.drvFact,m.drvEst]);
 
-  const mapOK = m.sigDesp!==""&&m.sigCli!==""&&m.sigProv!==""&&m.drvDesp!==""&&m.drvProv!=="";
+  const mapOK = m.sigDesp!==""&&m.sigCli!==""&&m.sigProv!==""&&m.drvDesp!==""&&m.drvProv!==""&&m.drvEst!=="";
 
   return (
     <div>
@@ -346,12 +350,12 @@ function App(){
                 <div style={{fontWeight:600,fontSize:13,marginTop:8,color:"#475569"}}>Planilla Drive</div>
                 <MapSelect label="N° de despacho" value={m.drvDesp} headers={drv.headers} onChange={v=>setM({...m,drvDesp:v})}/>
                 <MapSelect label="Proveedor" value={m.drvProv} headers={drv.headers} onChange={v=>setM({...m,drvProv:v})}/>
-                <MapSelect label="Estado (para el Tablero)" optional value={m.drvEst} headers={drv.headers} onChange={v=>setM({...m,drvEst:v})}/>
+                <MapSelect label="Estado" value={m.drvEst} headers={drv.headers} onChange={v=>setM({...m,drvEst:v})}/>
                 <MapSelect label="Facturador / asignado (Tablero)" optional value={m.drvFact} headers={drv.headers} onChange={v=>setM({...m,drvFact:v})}/>
               </div>
             </div>
             <div className="info" style={{marginTop:16}}>
-              <b>Cómo funciona el cruce:</b> muestra los despachos de SIGAD que <b>no</b> están en Drive, comparando por <b>número de despacho + proveedor</b>. Si el mismo despacho aparece con un proveedor distinto, se muestra (es trabajo nuevo). Se compara contra todas las hojas de meses de Drive.<br/><br/>
+              <b>Cómo funciona el cruce:</b> muestra los despachos de SIGAD que <b>no</b> están en Drive, comparando por <b>número de despacho + proveedor</b>, y deja <b>una sola fila por despacho</b>. Además se excluyen los despachos que en Drive figuren con estado vacío, para revisar o traspaso mes siguiente. Se compara contra todas las hojas de meses de Drive.<br/><br/>
               <b>Medición (Tablero):</b> cuentan como facturados: OK, para devolución, ajuste OK, ajuste contabilidad, devolución total, egreso creado desembolsos sin rendir, transferencia duplicada. El resto es no facturado.
             </div>
           </div>
@@ -389,7 +393,7 @@ function App(){
           </div>
 
           <button className="btn" style={{fontSize:15,padding:"11px 22px"}} disabled={!mapOK} onClick={generar}>Generar asignación →</button>
-          {!mapOK && <p className="muted" style={{marginTop:8}}>Completa el mapeo de despacho, cliente y proveedor en ambas planillas.</p>}
+          {!mapOK && <p className="muted" style={{marginTop:8}}>Completa el mapeo de despacho, cliente, proveedor y estado.</p>}
         </>)}
 
         {tab==="resultado" && (!result ? <div className="empty">Genera la asignación desde <b>Ajustes</b>.</div> : <>
