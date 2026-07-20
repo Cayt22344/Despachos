@@ -85,6 +85,22 @@ const norm = s => String(s==null?"":s).trim().toUpperCase().replace(/\s+/g," ");
 const normEst = s => stripAcc(String(s==null?"":s).trim().toUpperCase()).replace(/\s+/g," ");
 const despKey = v => String(v==null?"":v).trim().replace(/\.0+$/,"");
 const pairKey = (d,p) => despKey(d) + "||" + norm(p);
+// Dia (sin hora) de la fecha de emision del documento: acepta serial de Excel, Date o texto
+function dayKey(v){
+  if(v==null||v==="") return "";
+  if(v instanceof Date) return v.getFullYear()+"-"+String(v.getMonth()+1).padStart(2,"0")+"-"+String(v.getDate()).padStart(2,"0");
+  if(typeof v==="number" && isFinite(v)) return "S"+Math.floor(v);          // serial de Excel = 1 dia
+  const s=String(v).trim(); if(!s) return "";
+  const t=s.split(/[ T]/)[0];
+  const m=t.match(/^(\d{1,4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,4})$/);
+  if(m){
+    let a=m[1],b=m[2],c=m[3];
+    if(a.length===4) return a+"-"+b.padStart(2,"0")+"-"+c.padStart(2,"0");  // aaaa-mm-dd
+    if(c.length===2) c="20"+c;
+    return c+"-"+b.padStart(2,"0")+"-"+a.padStart(2,"0");                   // dd-mm-aaaa
+  }
+  return t.toUpperCase();
+}
 const today = () => { const d=new Date(); const p=n=>String(n).padStart(2,"0");
   return p(d.getDate())+"-"+p(d.getMonth()+1)+"-"+d.getFullYear(); };
 
@@ -185,7 +201,7 @@ function App(){
   const [drvWB,setDrvWB]=useState(null); const [drvName,setDrvName]=useState("");
   const [sigSheet,setSigSheet]=useState(0); const [sigHR,setSigHR]=useState(0);
   const [drvSheet,setDrvSheet]=useState(0); const [drvHR,setDrvHR]=useState(0);
-  const [m,setM]=useState({sigDesp:"",sigCli:"",sigAdu:"",sigProv:"",drvDesp:"",drvProv:"",drvEst:"",drvFact:""});
+  const [m,setM]=useState({sigDesp:"",sigCli:"",sigAdu:"",sigProv:"",sigFecha:"",drvDesp:"",drvProv:"",drvEst:"",drvFact:""});
   const [defPerson,setDefPerson]=useState("zbaeza");
   const [people,setPeople]=useState(PEOPLE_DEF);
   const [conf,setConf]=useState(CONF_DEF); const [newConf,setNewConf]=useState("");
@@ -199,7 +215,8 @@ function App(){
 
   function mapSig(headers){
     return { sigDesp:guessIdx(headers,["despacho","despach"]), sigCli:guessIdx(headers,["cliente","client"]),
-      sigAdu:guessIdx(headers,["aduana"]), sigProv:guessIdx(headers,["prestador del servicio","prestador","proveedor"]) };
+      sigAdu:guessIdx(headers,["aduana"]), sigProv:guessIdx(headers,["prestador del servicio","prestador","proveedor"]),
+      sigFecha:guessIdx(headers,["fecha doc","fecha documento","fecha emision","fecha de emision"]) };
   }
   function mapDrv(headers){
     return { drvDesp:guessIdx(headers,["despacho","despach"]), drvProv:guessIdx(headers,["proveedor","provee","prestador"]),
@@ -233,6 +250,7 @@ function App(){
 
   function generar(){
     const sD=Number(m.sigDesp), sC=Number(m.sigCli), sA=m.sigAdu===""?-1:Number(m.sigAdu), sP=Number(m.sigProv);
+    const sF=m.sigFecha===""?-1:Number(m.sigFecha);
     const dD=Number(m.drvDesp), dP=Number(m.drvProv), dE=Number(m.drvEst);
     // Drive (todas las hojas de meses): pares despacho+proveedor, proveedores existentes,
     // y despachos con estado a excluir
@@ -247,29 +265,50 @@ function App(){
         if(EXCLUIR_CRUCE.includes(normEst(row[dE]))) drvEstadoExcl.add(d);
       }
     });
-    // SIGAD: se dejan solo los despachos que NO estan en Drive, una fila por numero de
-    // despacho y ademas UN SOLO despacho nuevo por proveedor / prestador de servicio.
-    // La planilla Drive no se modifica: sus registros existentes se mantienen intactos.
-    const seenDesp=new Set(); const seenProvDup=new Set(); let omitProv=0;
-    let rr=0; const f=today(); const out=[];
+    // SIGAD: se dejan solo los despachos que NO estan en Drive y una fila por numero de
+    // despacho. La planilla Drive no se modifica: sus registros existentes se mantienen.
+    const seenDesp=new Set(); const cand=[];
     for(const r of sig.rows){
       const d=despKey(r[sD]); if(!d) continue;
       if(drvPair.has(pairKey(r[sD], r[sP]))) continue;   // ya esta en Drive con ese proveedor
       if(drvEstadoExcl.has(d)) continue;                 // en Drive con estado vacio/para revisar/traspaso
       if(seenDesp.has(d)) continue;                      // una sola fila por numero de despacho
-      const pv=norm(r[sP]);
-      if(pv){                                            // un solo despacho nuevo por proveedor
-        if(seenProvDup.has(pv)){ omitProv++; continue; }
-        seenProvDup.add(pv);
-      }
       seenDesp.add(d);
+      cand.push(r);
+    }
+    // Proveedor / prestador repetido entre los despachos NUEVOS:
+    //  - los que comparten el mismo dia de emision del documento: se dejan 2 y se elimina el resto
+    //  - los que quedan solos en una fecha: se descartan y se deja uno solo (regla anterior)
+    const porProv=new Map();
+    cand.forEach((r,i)=>{ const pv=norm(r[sP]);
+      if(!porProv.has(pv)) porProv.set(pv,[]); porProv.get(pv).push(i); });
+    const keep=new Set(); let omitProv=0;
+    porProv.forEach((idxs,pv)=>{
+      if(!pv || idxs.length===1){ idxs.forEach(i=>keep.add(i)); return; }
+      // agrupar por dia de emision; las filas sin fecha nunca forman grupo
+      const porDia=new Map(); const sinFecha=[];
+      idxs.forEach(i=>{ const k=dayKey(cand[i][sF]);
+        if(!k){ sinFecha.push(i); return; }
+        if(!porDia.has(k)) porDia.set(k,[]); porDia.get(k).push(i); });
+      const mismosDia=[...porDia.values()].filter(g=>g.length>=2);
+      if(mismosDia.length){
+        mismosDia.forEach(g=>{ g.slice(0,2).forEach(i=>keep.add(i)); omitProv+=g.length-2; });
+        omitProv += sinFecha.length;                      // fechas unicas: se descartan
+        [...porDia.values()].filter(g=>g.length===1).forEach(g=>{ omitProv+=g.length; });
+      } else {
+        keep.add(idxs[0]); omitProv += idxs.length-1;     // todas con fecha distinta: se deja uno
+      }
+    });
+    let rr=0; const f=today(); const out=[];
+    cand.forEach((r,i)=>{
+      if(!keep.has(i)) return;
       const cli=r[sC];
       let asign,tipo="ok";
       if(isConf(cli)){ asign="Primer facturador (pendiente)"; tipo="conf"; }
       else if(first5){ asign=people[rr%people.length]; rr++; }
       else asign=defPerson;
       out.push({despacho:r[sD], cliente:cli, aduana:sA<0?"":r[sA], proveedor:r[sP], designado:f, asignacion:asign, tipo});
-    }
+    });
     out.omitProv = omitProv;
     setResult(out); setTab("resultado");
   }
@@ -362,6 +401,7 @@ function App(){
                 <MapSelect label="Cliente" value={m.sigCli} headers={sig.headers} onChange={v=>setM({...m,sigCli:v})}/>
                 <MapSelect label="Prestador / proveedor" value={m.sigProv} headers={sig.headers} onChange={v=>setM({...m,sigProv:v})}/>
                 <MapSelect label="Aduana" optional value={m.sigAdu} headers={sig.headers} onChange={v=>setM({...m,sigAdu:v})}/>
+                <MapSelect label="Fecha de emisión del documento" value={m.sigFecha} headers={sig.headers} onChange={v=>setM({...m,sigFecha:v})}/>
               </div>
               <div>
                 <div style={{fontWeight:600,fontSize:13,marginTop:8,color:"#475569"}}>Planilla Drive</div>
@@ -372,7 +412,7 @@ function App(){
               </div>
             </div>
             <div className="info" style={{marginTop:16}}>
-              <b>Cómo funciona el cruce:</b> muestra los despachos de SIGAD que <b>no</b> están en Drive, comparando por <b>número de despacho + proveedor</b>, y deja <b>una sola fila por despacho</b>. De esos despachos nuevos se deja además <b>uno solo por proveedor / prestador de servicio</b>, para no repetir el mismo proveedor varias veces. La planilla Drive no se toca: sus registros existentes se mantienen. Además se excluyen los despachos que en Drive figuren con estado vacío, para revisar o traspaso mes siguiente. Se compara contra todas las hojas de meses de Drive.<br/><br/>
+              <b>Cómo funciona el cruce:</b> muestra los despachos de SIGAD que <b>no</b> están en Drive, comparando por <b>número de despacho + proveedor</b>, y deja <b>una sola fila por despacho</b>. Cuando un <b>proveedor / prestador se repite</b> entre los despachos nuevos, se revisa la <b>fecha de emisión del documento</b>: los que son del <b>mismo día</b> se reducen a <b>2</b> y se elimina el resto; si todos caen en días distintos se deja <b>uno solo</b>. La planilla Drive no se toca: sus registros existentes se mantienen. Además se excluyen los despachos que en Drive figuren con estado vacío, para revisar o traspaso mes siguiente. Se compara contra todas las hojas de meses de Drive.<br/><br/>
               <b>Medición (Tablero):</b> cuentan como facturados: OK, para devolución, ajuste OK, ajuste contabilidad, devolución total, egreso creado desembolsos sin rendir, transferencia duplicada. El resto es no facturado.
             </div>
           </div>
@@ -419,7 +459,7 @@ function App(){
             <div className="stat"><div className="lab">Confirmación de gastos</div><div className="val" style={{color:FACT}}>{result.filter(r=>r.tipo==="conf").length}</div></div>
             <div className="stat"><div className="lab">Modo</div><div className="val" style={{fontSize:18,paddingTop:8}}>{first5?"Reparto 5 días":"Persona por defecto"}</div></div>
           </div>
-          {result.omitProv>0 && <div className="info" style={{marginBottom:20}}>Se omitieron <b>{result.omitProv}</b> despacho(s) nuevo(s) de SIGAD por repetir un proveedor / prestador que ya quedó en la lista.</div>}
+          {result.omitProv>0 && <div className="info" style={{marginBottom:20}}>Se omitieron <b>{result.omitProv}</b> despacho(s) nuevo(s) de SIGAD por proveedor repetido, aplicando la regla de fecha de emisión (mismo día → se dejan 2; días distintos → se deja 1).</div>}
           {result.length===0 && <div className="note">No quedaron despachos. Revisa en <b>Ajustes</b> que despacho y proveedor estén bien mapeados en ambas planillas.</div>}
           <div className="card" style={{padding:0,overflow:"hidden"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",borderBottom:"1px solid #f1f5f9"}}>
