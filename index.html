@@ -70,7 +70,7 @@ const { useState, useEffect, useRef, useMemo } = React;
 const FACT = "#4f46e5", NOFA = "#fb7185";
 const PEOPLE_DEF = ["zbaeza","lurtubia","vanessahernandez","vretamales","jcisternas"];
 // Personas que SIEMPRE aparecen en la medicion del Tablero (aunque tengan 0 en el mes):
-const MEDICION_PEOPLE = ["zbaeza","lurtubia","vanessahernandez","vretamales","jcisternas","PFuentes"];
+const MEDICION_PEOPLE = ["zbaeza","lurtubia","vanessahernandez","vretamales","jcisternas","pfuentes"];
 const MONTHS = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPT","OCT","NOV","DIC"];
 
 // Estados que cuentan como facturado para la medicion:
@@ -236,7 +236,7 @@ function App(){
     const dD=Number(m.drvDesp), dP=Number(m.drvProv), dE=Number(m.drvEst);
     // Drive (todas las hojas de meses): pares despacho+proveedor, proveedores existentes,
     // y despachos con estado a excluir
-    const drvPair=new Set(); const drvEstadoExcl=new Set(); const drvProv=new Set();
+    const drvPair=new Set(); const drvEstadoExcl=new Set();
     drvWB.forEach(sheet=>{
       if(sheet.name.toUpperCase().includes("MEDICION")) return;
       const hr=detectHeaderRow(sheet.aoa);
@@ -244,13 +244,12 @@ function App(){
         const row=sheet.aoa[i]; if(!row) continue;
         const d=despKey(row[dD]); if(!d) continue;
         drvPair.add(pairKey(row[dD], row[dP]));
-        const p=norm(row[dP]); if(p) drvProv.add(p);      // proveedor / prestador ya presente en Drive
         if(EXCLUIR_CRUCE.includes(normEst(row[dE]))) drvEstadoExcl.add(d);
       }
     });
-    // SIGAD: una sola fila por despacho, dejando solo los que NO estan en Drive.
-    // Ademas: si el proveedor/prestador YA existe en Drive, se deja UN SOLO despacho nuevo
-    // de ese proveedor (los demas se omiten para no duplicar informacion).
+    // SIGAD: se dejan solo los despachos que NO estan en Drive, una fila por numero de
+    // despacho y ademas UN SOLO despacho nuevo por proveedor / prestador de servicio.
+    // La planilla Drive no se modifica: sus registros existentes se mantienen intactos.
     const seenDesp=new Set(); const seenProvDup=new Set(); let omitProv=0;
     let rr=0; const f=today(); const out=[];
     for(const r of sig.rows){
@@ -259,8 +258,8 @@ function App(){
       if(drvEstadoExcl.has(d)) continue;                 // en Drive con estado vacio/para revisar/traspaso
       if(seenDesp.has(d)) continue;                      // una sola fila por numero de despacho
       const pv=norm(r[sP]);
-      if(pv && drvProv.has(pv)){                         // proveedor duplicado entre ambas planillas
-        if(seenProvDup.has(pv)){ omitProv++; continue; } // ya dejamos 1 despacho de este proveedor
+      if(pv){                                            // un solo despacho nuevo por proveedor
+        if(seenProvDup.has(pv)){ omitProv++; continue; }
         seenProvDup.add(pv);
       }
       seenDesp.add(d);
@@ -287,10 +286,10 @@ function App(){
     if(!drv || m.drvFact===""||m.drvEst==="") return null;
     const dF=Number(m.drvFact), dE=Number(m.drvEst); const map={};
     // Las personas fijas siempre aparecen, aunque no tengan despachos en el mes
-    MEDICION_PEOPLE.forEach(p=>{ map[p.toLowerCase()]={usuario:p,fact:0,no:0,fijo:true}; });
+    MEDICION_PEOPLE.forEach(p=>{ const k=p.toLowerCase(); map[k]={usuario:k,fact:0,no:0,fijo:true}; });
     for(const r of drv.rows){ const u=String(r[dF]||"").trim(); if(!u) continue;
       const k=u.toLowerCase();   // "PFUENTES" y "pfuentes" cuentan como la misma persona
-      if(!map[k]) map[k]={usuario:u,fact:0,no:0};
+      if(!map[k]) map[k]={usuario:k,fact:0,no:0};   // nombre siempre en minusculas
       if(FACTURADO.includes(normEst(r[dE]))) map[k].fact++; else map[k].no++; }
     const rows=Object.values(map)
       .filter(r=>r.fijo || (r.fact+r.no)>0)
@@ -373,7 +372,7 @@ function App(){
               </div>
             </div>
             <div className="info" style={{marginTop:16}}>
-              <b>Cómo funciona el cruce:</b> muestra los despachos de SIGAD que <b>no</b> están en Drive, comparando por <b>número de despacho + proveedor</b>, y deja <b>una sola fila por despacho</b>. Si el <b>proveedor / prestador de servicio ya existe en Drive</b>, se deja <b>un solo despacho nuevo de ese proveedor</b> (el resto se omite para no duplicar información). Los proveedores que no están en Drive se muestran completos. Además se excluyen los despachos que en Drive figuren con estado vacío, para revisar o traspaso mes siguiente. Se compara contra todas las hojas de meses de Drive.<br/><br/>
+              <b>Cómo funciona el cruce:</b> muestra los despachos de SIGAD que <b>no</b> están en Drive, comparando por <b>número de despacho + proveedor</b>, y deja <b>una sola fila por despacho</b>. De esos despachos nuevos se deja además <b>uno solo por proveedor / prestador de servicio</b>, para no repetir el mismo proveedor varias veces. La planilla Drive no se toca: sus registros existentes se mantienen. Además se excluyen los despachos que en Drive figuren con estado vacío, para revisar o traspaso mes siguiente. Se compara contra todas las hojas de meses de Drive.<br/><br/>
               <b>Medición (Tablero):</b> cuentan como facturados: OK, para devolución, ajuste OK, ajuste contabilidad, devolución total, egreso creado desembolsos sin rendir, transferencia duplicada. El resto es no facturado.
             </div>
           </div>
@@ -420,7 +419,7 @@ function App(){
             <div className="stat"><div className="lab">Confirmación de gastos</div><div className="val" style={{color:FACT}}>{result.filter(r=>r.tipo==="conf").length}</div></div>
             <div className="stat"><div className="lab">Modo</div><div className="val" style={{fontSize:18,paddingTop:8}}>{first5?"Reparto 5 días":"Persona por defecto"}</div></div>
           </div>
-          {result.omitProv>0 && <div className="info" style={{marginBottom:20}}>Se omitieron <b>{result.omitProv}</b> despacho(s) de SIGAD porque su proveedor / prestador ya existe en Drive y se dejó solo uno por proveedor.</div>}
+          {result.omitProv>0 && <div className="info" style={{marginBottom:20}}>Se omitieron <b>{result.omitProv}</b> despacho(s) nuevo(s) de SIGAD por repetir un proveedor / prestador que ya quedó en la lista.</div>}
           {result.length===0 && <div className="note">No quedaron despachos. Revisa en <b>Ajustes</b> que despacho y proveedor estén bien mapeados en ambas planillas.</div>}
           <div className="card" style={{padding:0,overflow:"hidden"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px",borderBottom:"1px solid #f1f5f9"}}>
